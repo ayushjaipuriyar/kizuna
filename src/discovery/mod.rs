@@ -5,6 +5,9 @@ pub mod error;
 pub mod service_record;
 pub mod manager;
 pub mod strategies;
+pub mod api;
+pub mod cli;
+pub mod config;
 
 // Re-export legacy modules for backward compatibility
 pub mod udp {
@@ -17,6 +20,9 @@ pub mod mdns {
 pub use error::DiscoveryError;
 pub use service_record::ServiceRecord;
 pub use manager::DiscoveryManager;
+pub use api::{KizunaDiscovery, DiscoveryConfig, DiscoveryBuilder, DiscoveryEvent};
+pub use cli::DiscoveryCli;
+pub use config::{DiscoveryConfigFile, ConfigManager};
 
 // Keep the legacy Peer struct for backward compatibility
 #[derive(Debug, Clone)]
