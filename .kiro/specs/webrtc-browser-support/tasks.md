@@ -7,7 +7,7 @@
   - _Requirements: 10.1, 10.2_
 
 - [ ] 2. Implement WebRTC connection management and signaling
-  - [ ] 2.1 Create WebRTC peer connection establishment
+  - [x] 2.1 Create WebRTC peer connection establishment
     - Implement WebRTC peer connection creation with ICE candidate handling
     - Add signaling server integration for connection establishment
     - Create STUN/TURN server configuration and NAT traversal
