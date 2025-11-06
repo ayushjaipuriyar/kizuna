@@ -31,5 +31,11 @@ url = "2.4"
 stun = "0.5"
 rand = "0.8"
 
+# Web server dependencies for browser support
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+hyper = "1.0"
+
 [dev-dependencies]
 tempfile = "3.0"
