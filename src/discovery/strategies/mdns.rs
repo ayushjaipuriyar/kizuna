@@ -182,10 +182,9 @@ impl MdnsDiscovery {
         
         // Use mDNS to resolve the service name to IP addresses
         let stream = mdns::discover::all(service_name, timeout)
-            .map_err(|e| DiscoveryError::Network(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            .map_err(|e| DiscoveryError::Network(
                 format!("Failed to resolve service addresses: {}", e)
-            )))?.listen();
+            ))?.listen();
 
         pin_mut!(stream);
 
@@ -226,10 +225,9 @@ impl Discovery for MdnsDiscovery {
         
         // Create a stream to listen for mDNS responses
         let stream = mdns::discover::all(KIZUNA_SERVICE_NAME, timeout)
-            .map_err(|e| DiscoveryError::Network(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            .map_err(|e| DiscoveryError::Network(
                 format!("Failed to create mDNS discovery stream: {}", e)
-            )))?.listen();
+            ))?.listen();
 
         pin_mut!(stream);
 

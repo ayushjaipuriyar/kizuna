@@ -33,7 +33,6 @@ impl Default for DiscoveryConfig {
                 "udp".to_string(),
                 "tcp".to_string(),
                 "bluetooth".to_string(),
-                "libp2p".to_string(),
             ],
             peer_cache_ttl: Duration::from_secs(300), // 5 minutes
             max_concurrent_discoveries: 10,
@@ -133,13 +132,7 @@ impl KizunaDiscovery {
                         self.manager.add_strategy(Box::new(strategy));
                     }
                 }
-                "libp2p" => {
-                    // TODO: Fix libp2p strategy compilation issues
-                    // let strategy = crate::discovery::strategies::libp2p::Libp2pDiscovery::new()?;
-                    // if strategy.is_available() {
-                    //     self.manager.add_strategy(Box::new(strategy));
-                    // }
-                }
+
                 _ => {
                     return Err(DiscoveryError::StrategyUnavailable {
                         strategy: strategy_name.clone(),
@@ -156,35 +149,8 @@ impl KizunaDiscovery {
         let (sender, receiver) = mpsc::unbounded_channel();
         self.event_sender = Some(sender.clone());
 
-        let manager = self.manager.clone();
-        let config = self.config.clone();
-        let token = self.cancellation_token.clone();
-
-        // Spawn background discovery task
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(10));
-            
-            loop {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        match manager.discover_peers(config.default_timeout).await {
-                            Ok(peers) => {
-                                for peer in peers {
-                                    let _ = sender.send(DiscoveryEvent::PeerDiscovered(peer));
-                                }
-                            }
-                            Err(e) => {
-                                let _ = sender.send(DiscoveryEvent::Error(e.to_string()));
-                            }
-                        }
-                    }
-                    _ = token.cancelled() => {
-                        break;
-                    }
-                }
-            }
-        });
-
+        // For now, return the receiver without background task
+        // The user can call discover_once periodically
         Ok(receiver)
     }
 

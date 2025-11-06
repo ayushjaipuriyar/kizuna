@@ -11,12 +11,12 @@ pub struct StrategyConfig {
     pub enable_udp: bool,
     pub enable_tcp: bool,
     pub enable_bluetooth: bool,
-    pub enable_libp2p: bool,
+
     pub mdns_config: Option<MdnsConfig>,
     pub udp_config: Option<UdpConfig>,
     pub tcp_config: Option<TcpConfig>,
     pub bluetooth_config: Option<BluetoothConfig>,
-    pub libp2p_config: Option<Libp2pConfig>,
+
 }
 
 #[derive(Debug, Clone)]
@@ -50,11 +50,7 @@ pub struct BluetoothConfig {
     pub service_uuid: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct Libp2pConfig {
-    pub device_name: String,
-    pub bootstrap_nodes: Vec<String>, // Multiaddr strings
-}
+
 
 #[derive(Debug, Clone)]
 pub struct StrategyUsage {
@@ -427,12 +423,11 @@ impl Default for StrategyConfig {
             enable_udp: true,
             enable_tcp: true,
             enable_bluetooth: true,
-            enable_libp2p: true,
+
             mdns_config: None,
             udp_config: None,
             tcp_config: None,
             bluetooth_config: None,
-            libp2p_config: None,
         }
     }
 }
@@ -1804,7 +1799,6 @@ impl DiscoveryManager {
             udp::UdpDiscovery,
             tcp::TcpDiscovery,
             bluetooth::BluetoothDiscovery,
-            libp2p::Libp2pDiscovery,
         };
 
         let mut registered_count = 0;
@@ -1837,20 +1831,6 @@ impl DiscoveryManager {
             registered_count += 1;
         }
 
-        // Register libp2p strategy (if available)
-        // TODO: Fix libp2p strategy compilation issues
-        // match Libp2pDiscovery::new() {
-        //     Ok(libp2p_strategy) => {
-        //         if libp2p_strategy.is_available() {
-        //             self.add_strategy_async(Box::new(libp2p_strategy)).await;
-        //             registered_count += 1;
-        //         }
-        //     }
-        //     Err(_) => {
-        //         // libp2p not available, skip silently
-        //     }
-        // }
-
         if registered_count == 0 {
             return Err(DiscoveryError::Configuration(
                 "No discovery strategies are available on this platform".to_string()
@@ -1867,7 +1847,6 @@ impl DiscoveryManager {
             udp::UdpDiscovery,
             tcp::TcpDiscovery,
             bluetooth::BluetoothDiscovery,
-            libp2p::Libp2pDiscovery,
         };
 
         let mut registered_count = 0;
@@ -1945,35 +1924,6 @@ impl DiscoveryManager {
             }
         }
 
-        // Register libp2p strategy with config
-        // TODO: Fix libp2p strategy compilation issues
-        // if config.enable_libp2p {
-        //     let libp2p_result = if let Some(ref libp2p_config) = config.libp2p_config {
-        //         // Parse multiaddr strings
-        //         let bootstrap_addrs: Vec<_> = libp2p_config.bootstrap_nodes.iter()
-        //             .filter_map(|addr_str| addr_str.parse().ok())
-        //             .collect();
-        //         
-        //         Libp2pDiscovery::with_config(
-        //             libp2p_config.device_name.clone(),
-        //             bootstrap_addrs,
-        //         )
-        //     } else {
-        //         Libp2p Discovery::new()
-        //     };
-        //
-        //     match libp2p_result {
-        //         Ok(libp2p_strategy) => {
-        //             if libp2p_strategy.is_available() {
-        //                 self.add_strategy_async(Box::new(libp2p_strategy)).await;
-        //                 registered_count += 1;
-        //             }
-        //         }
-        //         Err(_) => {
-        //             // libp2p configuration failed, skip
-        //         }
-        //     }
-        // }
 
         if registered_count == 0 {
             return Err(DiscoveryError::Configuration(
@@ -2183,10 +2133,7 @@ mod tests {
     impl Discovery for MockDiscovery {
         async fn discover(&self, _timeout: Duration) -> Result<Vec<ServiceRecord>, DiscoveryError> {
             if self.should_fail {
-                Err(DiscoveryError::Network(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Mock failure"
-                )))
+                Err(DiscoveryError::Network("Mock failure".to_string()))
             } else {
                 Ok(self.peers_to_return.clone())
             }
@@ -2194,10 +2141,7 @@ mod tests {
 
         async fn announce(&self) -> Result<(), DiscoveryError> {
             if self.should_fail {
-                Err(DiscoveryError::Network(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Mock failure"
-                )))
+                Err(DiscoveryError::Network("Mock failure".to_string()))
             } else {
                 Ok(())
             }
@@ -2686,7 +2630,6 @@ mod tests {
             enable_udp: true,
             enable_tcp: false, // Disable TCP for this test
             enable_bluetooth: false, // Disable Bluetooth for this test
-            enable_libp2p: false, // Disable libp2p for this test
             mdns_config: Some(MdnsConfig {
                 peer_id: "test-peer".to_string(),
                 device_name: "Test Device".to_string(),
@@ -2700,7 +2643,6 @@ mod tests {
             }),
             tcp_config: None,
             bluetooth_config: None,
-            libp2p_config: None,
         };
         
         // This test would require actual strategy implementations to work

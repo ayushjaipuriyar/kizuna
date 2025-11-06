@@ -239,7 +239,7 @@ impl DiscoveryCli {
         println!("Performing discovery to generate statistics...");
         let _ = discovery.discover_once(Some(Duration::from_secs(3))).await;
 
-        let cached_peers = discovery.get_cached_peers();
+        let cached_peers = discovery.get_cached_peers().await;
         println!("\n=== Discovery Statistics ===");
         println!("Available strategies: {:?}", discovery.get_available_strategies());
         println!("Cached peers: {}", cached_peers.len());
@@ -349,7 +349,6 @@ impl DiscoveryCli {
         println!("  udp       - UDP broadcast discovery (local network)");
         println!("  tcp       - TCP handshake beacon (local network)");
         println!("  bluetooth - Bluetooth LE discovery (proximity)");
-        println!("  libp2p    - libp2p hybrid discovery (global)\n");
         
         println!("Configuration Parameters:");
         println!("  --timeout SECS        Discovery timeout in seconds (default: 5)");

@@ -53,18 +53,17 @@ impl UdpDiscovery {
     async fn send_discovery_broadcast(&self) -> Result<(), DiscoveryError> {
         // Check rate limiting
         if !self.can_broadcast().await {
-            return Err(DiscoveryError::Network(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Rate limit exceeded for UDP broadcast"
-            )));
+            return Err(DiscoveryError::Network(
+                "Rate limit exceeded for UDP broadcast".to_string()
+            ));
         }
 
         // Create a socket for sending broadcasts
         let socket = UdpSocket::bind("0.0.0.0:0").await
-            .map_err(DiscoveryError::Network)?;
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
         
         socket.set_broadcast(true)
-            .map_err(DiscoveryError::Network)?;
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
         // Try to broadcast on multiple interfaces
         let broadcast_addresses = vec![
@@ -89,17 +88,16 @@ impl UdpDiscovery {
             self.update_broadcast_time().await;
             Ok(())
         } else {
-            Err(DiscoveryError::Network(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to send broadcast on any interface"
-            )))
+            Err(DiscoveryError::Network(
+                "Failed to send broadcast on any interface".to_string()
+            ))
         }
     }
 
     async fn listen_for_responses(&self, timeout: Duration) -> Result<Vec<ServiceRecord>, DiscoveryError> {
         let bind_addr = format!("0.0.0.0:{}", self.port);
         let socket = UdpSocket::bind(&bind_addr).await
-            .map_err(DiscoveryError::Network)?;
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
         let mut peers = Vec::new();
         let mut buf = [0u8; 2048]; // Increased buffer size for larger messages
@@ -241,14 +239,14 @@ impl UdpDiscovery {
     /// Send a peer response message
     async fn send_peer_response(peer_id: String, device_name: String, port: u16, target_addr: SocketAddr) -> Result<(), DiscoveryError> {
         let socket = UdpSocket::bind("0.0.0.0:0").await
-            .map_err(DiscoveryError::Network)?;
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
         // Create response message with our peer information
         let response = format!("KIZUNA_PEER|{}|{}|{}||version=0.1.0,protocol=udp", 
             peer_id, device_name, port);
 
         socket.send_to(response.as_bytes(), target_addr).await
-            .map_err(DiscoveryError::Network)?;
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
 
         Ok(())
     }

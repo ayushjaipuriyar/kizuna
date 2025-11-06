@@ -22,14 +22,14 @@ async fn main() -> Result<()> {
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
             let verbose = args.contains(&"--verbose".to_string());
             
-            DiscoveryCli::discover_once(timeout, strategies, verbose).await?;
+            DiscoveryCli::discover_once(timeout, strategies, verbose).await.map_err(|e| anyhow::anyhow!("{}", e))?;
         }
         "discover-continuous" => {
             let strategies = parse_arg(&args, "--strategies")
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
             let verbose = args.contains(&"--verbose".to_string());
             
-            DiscoveryCli::discover_continuous(strategies, verbose).await?;
+            DiscoveryCli::discover_continuous(strategies, verbose).await.map_err(|e| anyhow::anyhow!("{}", e))?;
         }
         "announce" => {
             let name = parse_arg(&args, "--name").map(|s| s.to_string());
@@ -38,42 +38,42 @@ async fn main() -> Result<()> {
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
             let duration = parse_arg(&args, "--duration").and_then(|s| s.parse().ok());
             
-            DiscoveryCli::announce(name, port, strategies, duration).await?;
+            DiscoveryCli::announce(name, port, strategies, duration).await.map_err(|e| anyhow::anyhow!("{}", e))?;
         }
         "test-strategy" => {
-            let strategy = args.get(2).ok_or("Strategy name required")?.to_string();
+            let strategy = args.get(2).ok_or_else(|| anyhow::anyhow!("Strategy name required"))?.to_string();
             let timeout = parse_arg(&args, "--timeout").and_then(|s| s.parse().ok());
             let verbose = args.contains(&"--verbose".to_string());
             
-            DiscoveryCli::test_strategy(strategy, timeout, verbose).await?;
+            DiscoveryCli::test_strategy(strategy, timeout, verbose).await.map_err(|e| anyhow::anyhow!("{}", e))?;
         }
         "benchmark" => {
             let iterations = parse_arg(&args, "--iterations").and_then(|s| s.parse().ok());
             let timeout = parse_arg(&args, "--timeout").and_then(|s| s.parse().ok());
             
-            DiscoveryCli::benchmark(iterations, timeout).await?;
+            DiscoveryCli::benchmark(iterations, timeout).await.map_err(|e| anyhow::anyhow!("{}", e))?;
         }
         "stats" => {
             let strategies = parse_arg(&args, "--strategies")
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
             
-            DiscoveryCli::show_stats(strategies).await?;
+            DiscoveryCli::show_stats(strategies).await.map_err(|e| anyhow::anyhow!("{}", e))?;
         }
         "config" => {
             let subcommand = args.get(2).map(|s| s.as_str()).unwrap_or("show");
             match subcommand {
                 "init" => {
                     let force = args.contains(&"--force".to_string());
-                    ConfigManager::init_config(force)?;
+                    ConfigManager::init_config(force).map_err(|e| anyhow::anyhow!("{}", e))?;
                 }
                 "validate" => {
-                    let path = args.get(3).unwrap_or("kizuna-discovery.toml");
-                    ConfigManager::validate_config(path)?;
+                    let path = args.get(3).map_or("kizuna-discovery.toml", |v| v);
+                    ConfigManager::validate_config(path).map_err(|e| anyhow::anyhow!("{}", e))?;
                 }
                 "show" => {
-                    let path = args.get(3).unwrap_or("kizuna-discovery.toml");
+                    let path = args.get(3).map_or("kizuna-discovery.toml", |v| v);
                     if std::path::Path::new(path).exists() {
-                        ConfigManager::show_config(path)?;
+                        ConfigManager::show_config(path).map_err(|e| anyhow::anyhow!("{}", e))?;
                     } else {
                         println!("Configuration file not found. Showing default configuration:");
                         println!("{}", ConfigManager::generate_sample());
@@ -144,7 +144,7 @@ async fn main() -> Result<()> {
 }
 
 /// Parse command line argument value
-fn parse_arg(args: &[String], flag: &str) -> Option<&str> {
+fn parse_arg<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
     args.iter()
         .position(|arg| arg == flag)
         .and_then(|pos| args.get(pos + 1))
@@ -190,7 +190,6 @@ fn print_help() {
     println!("    udp                     UDP broadcast (local network)");
     println!("    tcp                     TCP handshake beacon (local network)");
     println!("    bluetooth               Bluetooth LE (proximity)");
-    println!("    libp2p                  libp2p hybrid (global)");
     println!();
     println!("EXAMPLES:");
     println!("    kizuna discover --strategies mdns,udp --timeout 10 --verbose");

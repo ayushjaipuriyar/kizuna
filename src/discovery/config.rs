@@ -66,7 +66,6 @@ fn default_enabled_strategies() -> Vec<String> {
         "udp".to_string(),
         "tcp".to_string(),
         "bluetooth".to_string(),
-        "libp2p".to_string(),
     ]
 }
 fn default_true() -> bool { true }
@@ -118,18 +117,6 @@ impl Default for DiscoveryConfigFile {
             parameters: {
                 let mut params = HashMap::new();
                 params.insert("service_uuid".to_string(), "6ba7b810-9dad-11d1-80b4-00c04fd430c8".to_string());
-                params
-            },
-        });
-        
-        // Default libp2p configuration
-        strategies.insert("libp2p".to_string(), StrategyConfigFile {
-            enabled: true,
-            priority: 40,
-            timeout_secs: Some(20),
-            parameters: {
-                let mut params = HashMap::new();
-                params.insert("bootstrap_nodes".to_string(), "".to_string()); // Empty by default
                 params
             },
         });

@@ -3,7 +3,7 @@ use std::time::Duration;
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum DiscoveryError {
     #[error("Network error: {0}")]
-    Network(#[from] std::io::Error),
+    Network(String),
     
     #[error("Strategy not available: {strategy}")]
     StrategyUnavailable { strategy: String },
@@ -17,9 +17,7 @@ pub enum DiscoveryError {
     #[error("Bluetooth error: {0}")]
     Bluetooth(String),
     
-    #[error("libp2p error: {0}")]
-    Libp2p(String),
-    
+
     #[error("Parse error: {0}")]
     Parse(String),
     
@@ -126,9 +124,12 @@ impl ErrorContext {
 
 impl From<anyhow::Error> for DiscoveryError {
     fn from(err: anyhow::Error) -> Self {
-        DiscoveryError::Network(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            err.to_string(),
-        ))
+        DiscoveryError::Network(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for DiscoveryError {
+    fn from(err: std::io::Error) -> Self {
+        DiscoveryError::Network(err.to_string())
     }
 }

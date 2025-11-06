@@ -84,7 +84,7 @@ impl TcpDiscovery {
         // Handle write timeout and errors
         match tokio::time::timeout(HANDSHAKE_TIMEOUT, stream.write_all(hello_msg.as_bytes())).await {
             Ok(Ok(_)) => {}, // Success
-            Ok(Err(e)) => return Err(DiscoveryError::Network(e)),
+            Ok(Err(e)) => return Err(DiscoveryError::Network(e.to_string())),
             Err(_) => return Err(DiscoveryError::Timeout { timeout: HANDSHAKE_TIMEOUT }),
         }
         
@@ -102,7 +102,7 @@ impl TcpDiscovery {
                 });
             }
             Ok(Ok(n)) => n,
-            Ok(Err(e)) => return Err(DiscoveryError::Network(e)),
+            Ok(Err(e)) => return Err(DiscoveryError::Network(e.to_string())),
             Err(_) => return Err(DiscoveryError::Timeout { timeout: HANDSHAKE_TIMEOUT }),
         };
         
@@ -249,7 +249,7 @@ impl TcpDiscovery {
     async fn start_beacon_server(&self) -> Result<(), DiscoveryError> {
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), self.port);
         let listener = TokioTcpListener::bind(addr).await
-            .map_err(DiscoveryError::Network)?;
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
         
         // Store the listener
         {
