@@ -7,20 +7,57 @@ use crate::browser_support::types::*;
 use webrtc::data_channel::{RTCDataChannel, data_channel_state::RTCDataChannelState};
 use webrtc::peer_connection::RTCPeerConnection;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, mpsc};
 use std::collections::HashMap;
+use uuid::Uuid;
+
+/// Message handler trait for different channel types
+#[async_trait::async_trait]
+pub trait ChannelMessageHandler: Send + Sync {
+    async fn handle_message(&self, channel_type: ChannelType, data: Vec<u8>) -> BrowserResult<()>;
+    async fn handle_text(&self, channel_type: ChannelType, text: String) -> BrowserResult<()>;
+}
 
 /// Data channel manager for WebRTC connections
 pub struct DataChannelManager {
+    connection_id: Uuid,
     channels: Arc<Mutex<HashMap<ChannelType, Arc<RTCDataChannel>>>>,
+    message_handlers: Arc<Mutex<HashMap<ChannelType, Arc<dyn ChannelMessageHandler>>>>,
+    event_sender: Option<mpsc::UnboundedSender<DataChannelEvent>>,
+}
+
+/// Data channel events
+#[derive(Debug, Clone)]
+pub enum DataChannelEvent {
+    ChannelOpened { connection_id: Uuid, channel_type: ChannelType },
+    ChannelClosed { connection_id: Uuid, channel_type: ChannelType },
+    MessageReceived { connection_id: Uuid, channel_type: ChannelType, data: Vec<u8> },
+    TextReceived { connection_id: Uuid, channel_type: ChannelType, text: String },
+    ChannelError { connection_id: Uuid, channel_type: ChannelType, error: String },
 }
 
 impl DataChannelManager {
     /// Create a new data channel manager
-    pub fn new() -> Self {
+    pub fn new(connection_id: Uuid) -> Self {
         Self {
+            connection_id,
             channels: Arc::new(Mutex::new(HashMap::new())),
+            message_handlers: Arc::new(Mutex::new(HashMap::new())),
+            event_sender: None,
         }
+    }
+    
+    /// Initialize the data channel manager with event handling
+    pub async fn initialize(&mut self) -> BrowserResult<mpsc::UnboundedReceiver<DataChannelEvent>> {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        self.event_sender = Some(sender);
+        Ok(receiver)
+    }
+    
+    /// Register a message handler for a specific channel type
+    pub async fn register_handler(&self, channel_type: ChannelType, handler: Arc<dyn ChannelMessageHandler>) {
+        let mut handlers = self.message_handlers.lock().await;
+        handlers.insert(channel_type, handler);
     }
     
     /// Create a data channel for a specific service

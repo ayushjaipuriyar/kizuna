@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kizuna Browser Support</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .feature { background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 5px; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+        button:hover { background: #0056b3; }
+        .qr-code { text-align: center; margin: 20px 0; }
+        #setup-info { background: #e9ecef; padding: 15px; border-radius: 5px; margin: 15px 0; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kizuna Browser Support</h1>
+        <p>Connect your browser to Kizuna peers for seamless file transfer, clipboard sync, and more.</p>
+        <div class="feature">
+            <h3>🔗 Quick Connect</h3>
+            <p>Generate a connection setup for browser clients to connect to this Kizuna peer.</p>
+            <button onclick="createConnectionSetup()">Create Connection Setup</button>
+            <div id="setup-info">
+                <h4>Connection Setup Created</h4>
+                <p><strong>Setup ID:</strong> <span id="setup-id"></span></p>
+                <p><strong>Connection URL:</strong> <a id="connection-url" href="#" target="_blank"></a></p>
+                <div class="qr-code"><div id="qr-code-container"></div></div>
+                <p><em>This setup expires in 5 minutes</em></p>
+            </div>
+        </div>
+        <div class="feature">
+            <h3>👥 Peer Discovery</h3>
+            <p>Discover and view available Kizuna peers in your network.</p>
+            <button onclick="discoverPeers()">Discover Peers</button>
+            <div id="peers-list"></div>
+        </div>
+        <div class="feature">
+            <h3>📊 Connection Status</h3>
+            <p>View active browser connections and their status.</p>
+            <button onclick="viewConnections()">View Connections</button>
+            <div id="connections-list"></div>
+        </div>
+    </div>
+    <script>
+        async function createConnectionSetup() {
+            try {
+                const response = await fetch('/api/setup/create', { method: 'POST' });
+                const setup = await response.json();
+                document.getElementById('setup-id').textContent = setup.setup_id;
+                document.getElementById('connection-url').textContent = setup.connection_url;
+                document.getElementById('connection-url').href = setup.connection_url;
+                const qrResponse = await fetch(`/api/setup/${setup.setup_id}/qr`);
+                const qrSvg = await qrResponse.text();
+                document.getElementById('qr-code-container').innerHTML = qrSvg;
+                document.getElementById('setup-info').style.display = 'block';
+            } catch (error) {
+                alert('Failed to create connection setup: ' + error.message);
+            }
+        }
+        async function discoverPeers() {
+            try {
+                const response = await fetch('/api/peers/discover');
+                const data = await response.json();
+                const peersList = document.getElementById('peers-list');
+                let html = '<h4>Local Peer</h4>';
+                html += '<div style="background: #e9ecef; padding: 10px; border-radius: 5px; margin: 10px 0;">';
+                html += '<strong>' + data.local_peer.name + '</strong> (' + data.local_peer.device_type + ')<br>';
+                html += '<small>Capabilities: ' + data.local_peer.capabilities.join(', ') + '</small>';
+                html += '</div>';
+                html += '<h4>Discovered Peers (' + data.discovered_peers.length + ')</h4>';
+                data.discovered_peers.forEach(peer => {
+                    html += '<div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">';
+                    html += '<strong>' + peer.name + '</strong> (' + peer.device_type + ')<br>';
+                    html += '<small>ID: ' + peer.peer_id + '</small><br>';
+                    html += '<small>Capabilities: ' + peer.capabilities.join(', ') + '</small>';
+                    html += '</div>';
+                });
+                peersList.innerHTML = html;
+            } catch (error) {
+                alert('Failed to discover peers: ' + error.message);
+            }
+        }
+        async function viewConnections() {
+            try {
+                const response = await fetch('/api/connections');
+                const data = await response.json();
+                const connectionsList = document.getElementById('connections-list');
+                let html = '<h4>Active Connections (' + data.count + ')</h4>';
+                data.connections.forEach(conn => {
+                    html += '<div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">';
+                    html += '<strong>Session:</strong> ' + conn.session_id + '<br>';
+                    html += '<strong>Peer:</strong> ' + conn.peer_id + '<br>';
+                    html += '<strong>State:</strong> ' + conn.connection_state + '<br>';
+                    html += '<strong>ICE State:</strong> ' + conn.ice_connection_state + '<br>';
+                    html += '<small>Last Activity: ' + new Date(conn.last_activity * 1000).toLocaleString() + '</small>';
+                    html += '</div>';
+                });
+                connectionsList.innerHTML = html;
+            } catch (error) {
+                alert('Failed to load connections: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

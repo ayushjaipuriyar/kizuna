@@ -171,6 +171,50 @@ pub enum BrowserMessageType {
     PeerDiscovery,
     StatusUpdate,
     Error,
+    // WebSocket fallback specific messages
+    WebSocketHandshake,
+    ProtocolNegotiation,
+    FallbackActivated,
+}
+
+/// Communication protocol type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CommunicationProtocol {
+    WebRTC,
+    WebSocket,
+}
+
+/// Protocol capabilities for feature detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtocolCapabilities {
+    pub supports_webrtc: bool,
+    pub supports_websocket: bool,
+    pub supports_file_transfer: bool,
+    pub supports_clipboard: bool,
+    pub supports_video_streaming: bool,
+    pub supports_command_execution: bool,
+}
+
+/// Unified connection interface
+#[derive(Debug, Clone)]
+pub struct UnifiedConnection {
+    pub connection_id: Uuid,
+    pub protocol: CommunicationProtocol,
+    pub session_id: Uuid,
+    pub capabilities: ProtocolCapabilities,
+    pub created_at: std::time::SystemTime,
+    pub last_activity: std::time::SystemTime,
+}
+
+/// WebSocket connection state
+#[derive(Debug, Clone)]
+pub struct WebSocketConnection {
+    pub connection_id: Uuid,
+    pub peer_id: String,
+    pub connection_state: ConnectionState,
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub created_at: std::time::SystemTime,
 }
 
 /// Web file representation for browser file transfers

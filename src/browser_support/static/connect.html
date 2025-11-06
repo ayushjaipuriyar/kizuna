@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect to Kizuna</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status { padding: 15px; margin: 20px 0; border-radius: 5px; }
+        .status.connecting { background: #fff3cd; border: 1px solid #ffeaa7; }
+        .status.connected { background: #d4edda; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .peer-info { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .capabilities { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .capability { background: #e9ecef; padding: 5px 10px; border-radius: 15px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Connect to Kizuna Peer</h1>
+        <div id="status" class="status connecting">Initializing connection...</div>
+        <div id="peer-info" class="peer-info" style="display: none;">
+            <h3>Peer Information</h3>
+            <div id="peer-details"></div>
+        </div>
+        <div id="connection-controls">
+            <button id="connect-btn" onclick="connectToPeer()">Connect</button>
+            <button id="disconnect-btn" onclick="disconnect()" style="display: none;">Disconnect</button>
+        </div>
+        <div id="connection-status" style="margin-top: 20px; display: none;">
+            <h3>Connection Status</h3>
+            <div id="status-details"></div>
+        </div>
+    </div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const setupId = urlParams.get('setup_id');
+        let connectionInfo = null;
+        let peerConnection = null;
+        let websocketConnection = null;
+        let dataChannels = {};
+        let currentProtocol = null;
+        let connectionAttempts = 0;
+        const maxConnectionAttempts = 3;
+
+        async function loadConnectionSetup() {
+            try {
+                const response = await fetch(`/api/setup/${setupId}`);
+                if (!response.ok) throw new Error('Setup not found or expired');
+                connectionInfo = await response.json();
+                displayPeerInfo(connectionInfo.peer_info);
+                updateStatus('Ready to connect', 'connecting');
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayPeerInfo(peerInfo) {
+            const peerDetails = document.getElementById('peer-details');
+            let html = '<p><strong>Name:</strong> ' + peerInfo.name + '</p>';
+            html += '<p><strong>Device Type:</strong> ' + peerInfo.device_type + '</p>';
+            html += '<p><strong>Peer ID:</strong> ' + peerInfo.peer_id + '</p>';
+            html += '<div class="capabilities">';
+            peerInfo.capabilities.forEach(cap => {
+                html += '<span class="capability">' + cap + '</span>';
+            });
+            html += '</div>';
+            peerDetails.innerHTML = html;
+            document.getElementById('peer-info').style.display = 'block';
+        }
+
+        // Protocol detection and capability checking
+        function detectProtocolCapabilities() {
+            const capabilities = {
+                supports_webrtc: !!(window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection),
+                supports_websocket: !!window.WebSocket,
+                supports_clipboard_api: !!navigator.clipboard,
+                browser_type: getBrowserType(),
+                platform: navigator.platform
+            };
+
+            // Check for WebRTC limitations
+            if (capabilities.supports_webrtc) {
+                // Safari mobile has WebRTC limitations
+                if (capabilities.browser_type === 'Safari' && capabilities.platform.includes('Mobile')) {
+                    capabilities.webrtc_reliable = false;
+                } else {
+                    capabilities.webrtc_reliable = true;
+                }
+            }
+
+            return capabilities;
+        }
+
+        async function connectToPeer() {
+            if (!connectionInfo) {
+                updateStatus('No connection info available', 'error');
+                return;
+            }
+
+            const capabilities = detectProtocolCapabilities();
+            
+            // Try WebRTC first if supported and reliable
+            if (capabilities.supports_webrtc && capabilities.webrtc_reliable) {
+                try {
+                    await connectViaWebRTC(capabilities);
+                    return;
+                } catch (error) {
+                    console.warn('WebRTC connection failed, falling back to WebSocket:', error);
+                    connectionAttempts++;
+                    
+                    if (connectionAttempts < maxConnectionAttempts) {
+                        updateStatus('WebRTC failed, trying WebSocket fallback...', 'connecting');
+                        await connectViaWebSocket(capabilities);
+                    } else {
+                        updateStatus(`All connection attempts failed: ${error.message}`, 'error');
+                    }
+                }
+            } else {
+                // Use WebSocket fallback directly
+                updateStatus('Using WebSocket connection (WebRTC not available)...', 'connecting');
+                await connectViaWebSocket(capabilities);
+            }
+        }
+
+        async function connectViaWebRTC(capabilities) {
+            updateStatus('Establishing WebRTC connection...', 'connecting');
+            
+            peerConnection = new RTCPeerConnection({iceServers: connectionInfo.ice_servers});
+            currentProtocol = 'webrtc';
+            
+            // Set up connection state handlers
+            peerConnection.oniceconnectionstatechange = () => {
+                updateConnectionStatus();
+                if (peerConnection.iceConnectionState === 'failed' || peerConnection.iceConnectionState === 'disconnected') {
+                    handleConnectionFailure('WebRTC connection failed');
+                }
+            };
+            
+            peerConnection.onconnectionstatechange = () => {
+                updateConnectionStatus();
+                if (peerConnection.connectionState === 'failed') {
+                    handleConnectionFailure('WebRTC peer connection failed');
+                }
+            };
+
+            // Create control data channel
+            const controlChannel = peerConnection.createDataChannel('control');
+            dataChannels.control = controlChannel;
+            
+            controlChannel.onopen = () => {
+                updateStatus('Connected via WebRTC!', 'connected');
+                onConnectionEstablished();
+            };
+            
+            controlChannel.onmessage = (event) => {
+                handleMessage(JSON.parse(event.data));
+            };
+
+            // Create offer and establish connection
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            const browserInfo = {
+                user_agent: navigator.userAgent,
+                browser_type: capabilities.browser_type,
+                version: getBrowserVersion(),
+                platform: capabilities.platform,
+                supports_webrtc: capabilities.supports_webrtc,
+                supports_clipboard_api: capabilities.supports_clipboard_api
+            };
+
+            const response = await fetch(`/api/connect?setup_id=${setupId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    browser_info: browserInfo,
+                    protocol: 'webrtc',
+                    offer: offer.sdp
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to establish WebRTC connection');
+            
+            const connectionData = await response.json();
+            
+            if (connectionData.answer) {
+                await peerConnection.setRemoteDescription({
+                    type: 'answer',
+                    sdp: connectionData.answer
+                });
+            }
+        }
+
+        async function connectViaWebSocket(capabilities) {
+            updateStatus('Establishing WebSocket connection...', 'connecting');
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/api/websocket?setup_id=${setupId}`;
+            
+            websocketConnection = new WebSocket(wsUrl);
+            currentProtocol = 'websocket';
+            
+            websocketConnection.onopen = () => {
+                // Send handshake message
+                const handshake = {
+                    message_type: 'WebSocketHandshake',
+                    payload: {
+                        browser_info: {
+                            user_agent: navigator.userAgent,
+                            browser_type: capabilities.browser_type,
+                            version: getBrowserVersion(),
+                            platform: capabilities.platform,
+                            supports_webrtc: capabilities.supports_webrtc,
+                            supports_clipboard_api: capabilities.supports_clipboard_api
+                        },
+                        protocol: 'websocket'
+                    },
+                    timestamp: Date.now()
+                };
+                
+                websocketConnection.send(JSON.stringify(handshake));
+            };
+            
+            websocketConnection.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                if (message.message_type === 'WebSocketHandshake' && message.payload.status === 'connected') {
+                    updateStatus('Connected via WebSocket!', 'connected');
+                    onConnectionEstablished();
+                } else {
+                    handleMessage(message);
+                }
+            };
+            
+            websocketConnection.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                updateStatus('WebSocket connection failed', 'error');
+            };
+            
+            websocketConnection.onclose = () => {
+                if (currentProtocol === 'websocket') {
+                    updateStatus('WebSocket connection closed', 'connecting');
+                    onConnectionClosed();
+                }
+            };
+        }
+
+        function handleConnectionFailure(reason) {
+            console.warn('Connection failure:', reason);
+            connectionAttempts++;
+            
+            if (currentProtocol === 'webrtc' && connectionAttempts < maxConnectionAttempts) {
+                // Try WebSocket fallback
+                updateStatus('WebRTC failed, trying WebSocket fallback...', 'connecting');
+                const capabilities = detectProtocolCapabilities();
+                connectViaWebSocket(capabilities).catch(error => {
+                    updateStatus(`Fallback failed: ${error.message}`, 'error');
+                });
+            } else {
+                updateStatus(`Connection failed: ${reason}`, 'error');
+            }
+        }
+
+        function handleMessage(message) {
+            console.log('Received message:', message);
+            
+            switch (message.message_type) {
+                case 'FallbackActivated':
+                    updateStatus('Switched to WebSocket fallback', 'connected');
+                    break;
+                case 'StatusUpdate':
+                    // Handle status updates
+                    break;
+                default:
+                    console.log('Unhandled message type:', message.message_type);
+            }
+        }
+
+        function onConnectionEstablished() {
+            document.getElementById('connect-btn').style.display = 'none';
+            document.getElementById('disconnect-btn').style.display = 'inline-block';
+            document.getElementById('connection-status').style.display = 'block';
+            connectionAttempts = 0; // Reset attempts on successful connection
+        }
+
+        function onConnectionClosed() {
+            document.getElementById('connect-btn').style.display = 'inline-block';
+            document.getElementById('disconnect-btn').style.display = 'none';
+            document.getElementById('connection-status').style.display = 'none';
+        }
+
+        function disconnect() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+                dataChannels = {};
+            }
+            
+            if (websocketConnection) {
+                websocketConnection.close();
+                websocketConnection = null;
+            }
+            
+            currentProtocol = null;
+            updateStatus('Disconnected', 'connecting');
+            onConnectionClosed();
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function updateConnectionStatus() {
+            const statusDetails = document.getElementById('status-details');
+            let html = `<p><strong>Protocol:</strong> ${currentProtocol || 'None'}</p>`;
+            
+            if (peerConnection && currentProtocol === 'webrtc') {
+                html += '<p><strong>Connection State:</strong> ' + peerConnection.connectionState + '</p>';
+                html += '<p><strong>ICE Connection State:</strong> ' + peerConnection.iceConnectionState + '</p>';
+                html += '<p><strong>Signaling State:</strong> ' + peerConnection.signalingState + '</p>';
+            } else if (websocketConnection && currentProtocol === 'websocket') {
+                html += '<p><strong>WebSocket State:</strong> ' + websocketConnection.readyState + '</p>';
+                html += '<p><strong>Connection Type:</strong> WebSocket Fallback</p>';
+            }
+            
+            statusDetails.innerHTML = html;
+        }
+
+        function getBrowserType() {
+            const userAgent = navigator.userAgent;
+            if (userAgent.includes('Chrome')) return 'Chrome';
+            if (userAgent.includes('Firefox')) return 'Firefox';
+            if (userAgent.includes('Safari')) return 'Safari';
+            if (userAgent.includes('Edge')) return 'Edge';
+            return 'Other';
+        }
+
+        function getBrowserVersion() {
+            const userAgent = navigator.userAgent;
+            const match = userAgent.match(/(Chrome|Firefox|Safari|Edge)\/([0-9.]+)/);
+            return match ? match[2] : 'Unknown';
+        }
+
+        window.onload = loadConnectionSetup;
+    </script>
+</body>
+</html>

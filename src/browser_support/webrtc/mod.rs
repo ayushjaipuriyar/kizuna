@@ -182,6 +182,43 @@ impl WebRTCManager {
         Ok(())
     }
     
+    /// Send message via WebRTC data channel
+    pub async fn send_message(&self, session_id: Uuid, message: crate::browser_support::BrowserMessage) -> BrowserResult<()> {
+        if let Some(_session) = self.active_connections.get(&session_id) {
+            // TODO: Implement message sending via WebRTC data channel
+            // This would route the message to the appropriate data channel based on message type
+            Ok(())
+        } else {
+            Err(BrowserSupportError::SessionError {
+                session_id: session_id.to_string(),
+                error: "Session not found".to_string(),
+            })
+        }
+    }
+    
+    /// Receive message from WebRTC data channel
+    pub async fn receive_message(&self, session_id: Uuid) -> BrowserResult<Option<crate::browser_support::BrowserMessage>> {
+        if let Some(_session) = self.active_connections.get(&session_id) {
+            // TODO: Implement message receiving from WebRTC data channel
+            // This would poll the appropriate data channel for incoming messages
+            Ok(None)
+        } else {
+            Err(BrowserSupportError::SessionError {
+                session_id: session_id.to_string(),
+                error: "Session not found".to_string(),
+            })
+        }
+    }
+    
+    /// Check if WebRTC connection is active
+    pub async fn is_connected(&self, session_id: Uuid) -> BrowserResult<bool> {
+        if let Some(session) = self.active_connections.get(&session_id) {
+            Ok(matches!(session.webrtc_connection.connection_state, ConnectionState::Connected))
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Shutdown the WebRTC manager
     pub async fn shutdown(&mut self) -> BrowserResult<()> {
         // Close all active connections

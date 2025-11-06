@@ -13,19 +13,19 @@
     - Create STUN/TURN server configuration and NAT traversal
     - _Requirements: 1.1, 1.3, 8.3_
 
-  - [ ] 2.2 Implement DataChannel management for different services
+  - [x] 2.2 Implement DataChannel management for different services
     - Create DataChannel creation and management for file transfer, clipboard, command, and video
     - Add DataChannel message routing and protocol handling
     - Implement connection state monitoring and automatic reconnection
     - _Requirements: 1.1, 1.4_
 
-  - [ ] 2.3 Add browser discovery and connection setup
+  - [x] 2.3 Add browser discovery and connection setup
     - Implement QR code and URL-based connection setup for browsers
     - Add automatic peer discovery from browser clients
     - Create connection status reporting and peer information display
     - _Requirements: 8.1, 8.2, 8.4_
 
-  - [ ] 2.4 Create WebSocket fallback for unsupported browsers
+  - [-] 2.4 Create WebSocket fallback for unsupported browsers
     - Implement WebSocket-based communication for browsers without WebRTC support
     - Add automatic fallback detection and protocol switching
     - Create unified communication interface abstracting WebRTC and WebSocket
