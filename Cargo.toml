@@ -8,7 +8,7 @@ tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 async-trait = "0.1"
 thiserror = "1.0"
-uuid = { version = "1.0", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
 futures = "0.3"
 futures-util = "0.3"
 mdns = "3.0"
@@ -31,11 +31,63 @@ url = "2.4"
 stun = "0.5"
 rand = "0.8"
 
+# Security/cryptography dependencies
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+chacha20poly1305 = "0.10"
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+sha2 = "0.10"
+hmac = "0.12"
+zeroize = { version = "1.7", features = ["derive"] }
+keyring = "2.3"
+hex = "0.4"
+whoami = "1.5"
+
+# File transfer dependencies
+walkdir = "2.4"
+lz4_flex = "0.11"
+bincode = "1.3"
+
 # Web server dependencies for browser support
 axum = "0.7"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "fs"] }
 hyper = "1.0"
 
+# Clipboard dependencies
+arboard = "3.3"
+image = "0.24"
+regex = "1.10"
+rusqlite = { version = "0.30", features = ["bundled"] }
+notify-rust = "4.10"
+chrono = "0.4"
+
+# Platform-specific clipboard dependencies
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.25"
+objc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11 = { version = "2.21", features = ["xlib"] }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.31", features = ["client"] }
+
+# FFI and language binding dependencies
+libloading = "0.8"
+
+# Optional language binding dependencies
+napi = { version = "2", optional = true, default-features = false, features = ["napi9", "async"] }
+napi-derive = { version = "2", optional = true }
+pyo3 = { version = "0.20", optional = true, features = ["extension-module"] }
+flutter_rust_bridge = { version = "2", optional = true }
+
 [dev-dependencies]
 tempfile = "3.0"
+
+[features]
+default = []
+nodejs = ["napi", "napi-derive"]
+python = ["pyo3"]
+flutter = ["flutter_rust_bridge"]
