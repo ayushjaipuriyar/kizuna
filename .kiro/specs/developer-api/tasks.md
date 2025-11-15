@@ -1,12 +1,12 @@
 # Implementation Plan
 
-- [ ] 1. Set up developer API module structure and core framework
+- [-] 1. Set up developer API module structure and core framework
   - Create developer API module directory with core, bindings, plugins, and tools submodules
   - Add FFI and language binding dependencies (napi, pyo3, flutter_rust_bridge)
   - Define core API traits, error types, and data structures
   - _Requirements: 1.1, 1.3_
 
-- [ ] 2. Implement core Rust API and async runtime integration
+- [-] 2. Implement core Rust API and async runtime integration
   - [ ] 2.1 Create main KizunaAPI trait and implementation
     - Implement core API interface with async/await support
     - Add comprehensive error handling with structured error types
