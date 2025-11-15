@@ -82,7 +82,10 @@ impl WebSocketFallbackManager {
             connections.insert(session_id, websocket_session.clone());
         }
         
-        self.message_handlers.insert(session_id, message_tx);
+        // Note: message_handlers expects BrowserMessage but we have Message
+        // For now, we'll skip storing in message_handlers as WebSocket sessions
+        // handle messages differently through the WebSocket protocol
+        // TODO: Create a proper message conversion layer if needed
         
         // Create browser session compatible with WebRTC interface
         let browser_session = BrowserSession {
@@ -183,6 +186,9 @@ impl WebSocketFallbackManager {
                     }
                 }
                 Ok(Message::Binary(data)) => {
+                    // Store data length before moving
+                    let data_len = data.len();
+                    
                     // Handle binary data (file transfers, etc.)
                     self.handle_binary_data(session_id, data).await?;
                     
@@ -190,7 +196,7 @@ impl WebSocketFallbackManager {
                     {
                         let mut connections_guard = connections.write().await;
                         if let Some(session) = connections_guard.get_mut(&session_id) {
-                            session.websocket_connection.bytes_received += data.len() as u64;
+                            session.websocket_connection.bytes_received += data_len as u64;
                             session.last_activity = std::time::SystemTime::now();
                         }
                     }
@@ -209,6 +215,10 @@ impl WebSocketFallbackManager {
                 }
                 Ok(Message::Pong(_)) => {
                     // Handle pong response
+                    continue;
+                }
+                Ok(Message::Frame(_)) => {
+                    // Raw frame - typically not used in high-level API
                     continue;
                 }
                 Err(e) => {
@@ -421,14 +431,16 @@ impl WebSocketFallbackManager {
     pub async fn get_connection_stats(&self, session_id: Uuid) -> BrowserResult<ConnectionStats> {
         let connections = self.active_connections.read().await;
         if let Some(session) = connections.get(&session_id) {
+            let uptime = session.created_at.elapsed().unwrap_or(std::time::Duration::ZERO);
             Ok(ConnectionStats {
                 bytes_sent: session.websocket_connection.bytes_sent,
                 bytes_received: session.websocket_connection.bytes_received,
                 packets_sent: 0, // WebSocket doesn't track packets
                 packets_received: 0,
-                round_trip_time: None, // Not available for WebSocket
-                jitter: None,
-                packet_loss_rate: None,
+                rtt_ms: None, // Not available for WebSocket
+                jitter_ms: None,
+                packet_loss_rate: 0.0,
+                connection_uptime: uptime,
             })
         } else {
             Err(BrowserSupportError::SessionError {

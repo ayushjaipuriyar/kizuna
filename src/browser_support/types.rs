@@ -58,7 +58,7 @@ pub enum BrowserType {
 }
 
 /// Browser session representing an active connection
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BrowserSession {
     pub session_id: Uuid,
     pub browser_info: BrowserInfo,
@@ -69,7 +69,7 @@ pub struct BrowserSession {
 }
 
 /// WebRTC connection state
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WebRTCConnection {
     pub connection_id: Uuid,
     pub peer_id: String,
@@ -89,7 +89,7 @@ pub enum ChannelType {
 }
 
 /// Data channel information
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DataChannelInfo {
     pub channel_type: ChannelType,
     pub ready_state: DataChannelState,
@@ -278,4 +278,17 @@ pub struct AppIcon {
     #[serde(rename = "type")]
     pub icon_type: String,
     pub purpose: Option<String>,
+}
+
+/// Connection statistics for browser connections
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionStats {
+    pub bytes_sent: u64,
+    pub bytes_received: u64,
+    pub packets_sent: u64,
+    pub packets_received: u64,
+    pub rtt_ms: Option<u64>,
+    pub jitter_ms: Option<u64>,
+    pub packet_loss_rate: f64,
+    pub connection_uptime: std::time::Duration,
 }

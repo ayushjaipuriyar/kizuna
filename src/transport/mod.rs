@@ -14,6 +14,7 @@ pub mod relay;
 pub mod routing;
 pub mod api;
 pub mod discovery_integration;
+pub mod security_integration;
 
 #[cfg(doc)]
 pub mod examples;
@@ -29,7 +30,7 @@ pub use manager::{
 pub use connection::{Connection, ConnectionInfo};
 pub use error::{TransportError, ErrorSeverity, RetryStrategy, ErrorCategory, ErrorContext, ContextualError};
 pub use error_handler::{ErrorHandler, ErrorHandlerConfig, ErrorStats, CircuitBreaker, CircuitBreakerState, ErrorHandlerHealth};
-pub use logging::{TransportLogger, LoggingConfig, LogLevel, LogCategory, LogEntry, ConnectionEvent, SecurityEvent};
+pub use logging::{TransportLogger, LoggingConfig, LogLevel, LogCategory, LogEntry, ConnectionEvent as LogConnectionEvent, SecurityEvent as LogSecurityEvent};
 pub use performance::{
     PerformanceMonitor, PerformanceConfig, ConnectionMetrics, GlobalPerformanceStats,
     BandwidthManager, BandwidthTracker, BandwidthAllocationStrategy, ConnectionPoolOptimizer,
@@ -67,6 +68,9 @@ pub use api::{
 pub use discovery_integration::{
     TransportDiscoveryBridge, TransportDiscoveryConfig, TransportDiscoveryEvent,
     TransportDiscoveryCallback, IntegrationStats
+};
+pub use security_integration::{
+    TransportSecurityHooks, SecureConnection
 };
 
 /// Unique identifier for a peer in the network

@@ -25,7 +25,7 @@
     - Create connection status reporting and peer information display
     - _Requirements: 8.1, 8.2, 8.4_
 
-  - [-] 2.4 Create WebSocket fallback for unsupported browsers
+  - [ ] 2.4 Create WebSocket fallback for unsupported browsers
     - Implement WebSocket-based communication for browsers without WebRTC support
     - Add automatic fallback detection and protocol switching
     - Create unified communication interface abstracting WebRTC and WebSocket

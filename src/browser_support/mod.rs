@@ -42,8 +42,8 @@ pub trait BrowserSupportSystem {
 
 /// Browser support system implementation
 pub struct BrowserSupport {
-    communication_manager: communication::UnifiedCommunicationManager,
-    api_server: api::APIServer,
+    communication_manager: Arc<tokio::sync::RwLock<communication::UnifiedCommunicationManager>>,
+    api_server: Arc<tokio::sync::RwLock<api::APIServer>>,
     pwa_controller: pwa::PWAController,
     discovery_manager: Arc<discovery::BrowserDiscovery>,
 }
@@ -54,8 +54,8 @@ impl BrowserSupport {
         let discovery_manager = Arc::new(discovery::BrowserDiscovery::new(peer_id, device_name));
         
         Self {
-            communication_manager: communication::UnifiedCommunicationManager::new(),
-            api_server: api::APIServer::new(discovery_manager.clone()),
+            communication_manager: Arc::new(tokio::sync::RwLock::new(communication::UnifiedCommunicationManager::new())),
+            api_server: Arc::new(tokio::sync::RwLock::new(api::APIServer::new(discovery_manager.clone()))),
             pwa_controller: pwa::PWAController::new(),
             discovery_manager,
         }
@@ -65,19 +65,14 @@ impl BrowserSupport {
     pub fn discovery(&self) -> &discovery::BrowserDiscovery {
         &self.discovery_manager
     }
-    
-    /// Get the communication manager
-    pub fn communication(&self) -> &communication::UnifiedCommunicationManager {
-        &self.communication_manager
-    }
 }
 
 #[async_trait::async_trait]
 impl BrowserSupportSystem for BrowserSupport {
     async fn initialize(&mut self) -> Result<()> {
-        self.communication_manager.initialize().await
+        self.communication_manager.write().await.initialize().await
             .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to initialize communication manager: {:?}", e))) as Box<dyn std::error::Error + Send + Sync>)?;
-        self.api_server.initialize().await?;
+        self.api_server.write().await.initialize().await?;
         self.pwa_controller.initialize().await?;
         Ok(())
     }
@@ -91,18 +86,19 @@ impl BrowserSupportSystem for BrowserSupport {
         self.discovery_manager.initialize(addr).await
             .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to initialize discovery: {:?}", e))) as Box<dyn std::error::Error + Send + Sync>)?;
         
-        self.api_server.start(port).await
+        self.api_server.write().await.start(port).await
+            .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to start API server: {:?}", e))) as Box<dyn std::error::Error + Send + Sync>)
     }
     
     async fn handle_browser_connection(&self, connection_info: BrowserConnectionInfo) -> Result<BrowserSession> {
-        self.communication_manager.establish_connection(connection_info).await
+        self.communication_manager.write().await.establish_connection(connection_info).await
             .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to establish browser connection: {:?}", e))) as Box<dyn std::error::Error + Send + Sync>)
     }
     
     async fn shutdown(&mut self) -> Result<()> {
         self.pwa_controller.shutdown().await?;
-        self.api_server.shutdown().await?;
-        self.communication_manager.shutdown().await
+        self.api_server.write().await.shutdown().await?;
+        self.communication_manager.write().await.shutdown().await
             .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to shutdown communication manager: {:?}", e))) as Box<dyn std::error::Error + Send + Sync>)?;
         Ok(())
     }

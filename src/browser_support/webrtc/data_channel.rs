@@ -169,7 +169,9 @@ impl DataChannelManager {
         let channels = self.channels.lock().await;
         
         if let Some(channel) = channels.get(channel_type) {
-            channel.send(&webrtc::data_channel::data_channel_message::DataChannelMessage::Binary(data.to_vec()))
+            // In webrtc v0.11, use Bytes::from for binary data
+            use bytes::Bytes;
+            channel.send(&Bytes::from(data.to_vec()))
                 .await
                 .map_err(|e| BrowserSupportError::WebRTCError {
                     reason: format!("Failed to send data on {:?} channel: {}", channel_type, e),
@@ -188,7 +190,9 @@ impl DataChannelManager {
         let channels = self.channels.lock().await;
         
         if let Some(channel) = channels.get(channel_type) {
-            channel.send(&webrtc::data_channel::data_channel_message::DataChannelMessage::Text(text.to_string()))
+            // In webrtc v0.11, convert text to Bytes
+            use bytes::Bytes;
+            channel.send(&Bytes::from(text.as_bytes().to_vec()))
                 .await
                 .map_err(|e| BrowserSupportError::WebRTCError {
                     reason: format!("Failed to send text on {:?} channel: {}", channel_type, e),

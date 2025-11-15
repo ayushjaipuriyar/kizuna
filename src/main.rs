@@ -2,8 +2,8 @@ use anyhow::Result;
 use std::env;
 use std::time::Duration;
 
-mod discovery;
-use discovery::{
+// Use the library's discovery module instead of re-declaring it
+use kizuna::discovery::{
     Discovery, DiscoveryManager, KizunaDiscovery, DiscoveryCli, ConfigManager,
     DiscoveryConfigFile, discovery_selector,
     strategies::{udp::UdpDiscovery, mdns::MdnsDiscovery},

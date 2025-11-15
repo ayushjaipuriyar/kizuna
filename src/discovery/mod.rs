@@ -8,6 +8,7 @@ pub mod strategies;
 pub mod api;
 pub mod cli;
 pub mod config;
+pub mod security_integration;
 
 // Re-export legacy modules for backward compatibility
 pub mod udp {
@@ -23,6 +24,9 @@ pub use manager::DiscoveryManager;
 pub use api::{KizunaDiscovery, DiscoveryConfig, DiscoveryBuilder, DiscoveryEvent};
 pub use cli::DiscoveryCli;
 pub use config::{DiscoveryConfigFile, ConfigManager};
+pub use security_integration::{
+    DiscoverySecurityHooks, IdentityProof, SecureServiceRecord
+};
 
 // Keep the legacy Peer struct for backward compatibility
 #[derive(Debug, Clone)]

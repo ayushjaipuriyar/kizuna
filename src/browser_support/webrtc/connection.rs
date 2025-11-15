@@ -125,9 +125,10 @@ impl ConnectionEstablisher {
         let connection_id_clone = connection_id;
         
         // Set up connection state change handler
-        peer_connection.on_connection_state_change(Box::new(move |state| {
+        // Note: Using on_ice_connection_state_change as on_connection_state_change doesn't exist in webrtc v0.11
+        peer_connection.on_ice_connection_state_change(Box::new(move |state| {
             let conn_id = connection_id_clone;
-            println!("WebRTC connection {} state changed: {:?}", conn_id, state);
+            println!("WebRTC connection {} ICE state changed: {:?}", conn_id, state);
             Box::pin(async move {
                 // TODO: Update connection state in storage
             })
@@ -260,8 +261,14 @@ impl ConnectionEstablisher {
                 reason: format!("Connection {} not found", connection_id),
             })?;
         
+        // Convert RTCIceCandidate to RTCIceCandidateInit
+        let candidate_init = candidate.to_json()
+            .map_err(|e| BrowserSupportError::WebRTCError {
+                reason: format!("Failed to convert ICE candidate: {}", e),
+            })?;
+        
         // Add ICE candidate
-        peer_connection.add_ice_candidate(candidate).await
+        peer_connection.add_ice_candidate(candidate_init).await
             .map_err(|e| BrowserSupportError::WebRTCError {
                 reason: format!("Failed to add ICE candidate: {}", e),
             })?;
@@ -311,9 +318,10 @@ impl ConnectionEstablisher {
             bytes_received: 0, // TODO: Extract from WebRTC stats
             packets_sent: 0, // TODO: Extract from WebRTC stats
             packets_received: 0, // TODO: Extract from WebRTC stats
-            round_trip_time: None, // TODO: Extract from WebRTC stats
-            jitter: None, // TODO: Extract from WebRTC stats
-            packet_loss_rate: None, // TODO: Extract from WebRTC stats
+            rtt_ms: None, // TODO: Extract from WebRTC stats
+            jitter_ms: None, // TODO: Extract from WebRTC stats
+            packet_loss_rate: 0.0, // TODO: Extract from WebRTC stats
+            connection_uptime: std::time::Duration::from_secs(0), // TODO: Track connection time
         };
         
         Ok(connection_stats)

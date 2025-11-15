@@ -8,6 +8,7 @@ use crate::browser_support::types::*;
 use crate::browser_support::webrtc::WebRTCManager;
 use crate::browser_support::websocket_fallback::WebSocketFallbackManager;
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 use async_trait::async_trait;
 
@@ -32,8 +33,8 @@ pub trait CommunicationInterface {
 
 /// Unified communication manager that handles both WebRTC and WebSocket protocols
 pub struct UnifiedCommunicationManager {
-    webrtc_manager: WebRTCManager,
-    websocket_manager: WebSocketFallbackManager,
+    webrtc_manager: Arc<tokio::sync::RwLock<WebRTCManager>>,
+    websocket_manager: Arc<tokio::sync::RwLock<WebSocketFallbackManager>>,
     active_connections: HashMap<Uuid, UnifiedConnection>,
     protocol_detector: ProtocolDetector,
 }
@@ -42,8 +43,8 @@ impl UnifiedCommunicationManager {
     /// Create a new unified communication manager
     pub fn new() -> Self {
         Self {
-            webrtc_manager: WebRTCManager::new(),
-            websocket_manager: WebSocketFallbackManager::new(),
+            webrtc_manager: Arc::new(tokio::sync::RwLock::new(WebRTCManager::new())),
+            websocket_manager: Arc::new(tokio::sync::RwLock::new(WebSocketFallbackManager::new())),
             active_connections: HashMap::new(),
             protocol_detector: ProtocolDetector::new(),
         }
@@ -51,8 +52,8 @@ impl UnifiedCommunicationManager {
     
     /// Initialize the communication manager
     pub async fn initialize(&mut self) -> BrowserResult<()> {
-        self.webrtc_manager.initialize().await?;
-        self.websocket_manager.initialize().await?;
+        self.webrtc_manager.write().await.initialize().await?;
+        self.websocket_manager.write().await.initialize().await?;
         Ok(())
     }
     
@@ -73,7 +74,7 @@ impl UnifiedCommunicationManager {
     
     /// Establish WebRTC connection
     async fn establish_webrtc_connection(&mut self, connection_info: BrowserConnectionInfo) -> BrowserResult<BrowserSession> {
-        let session = self.webrtc_manager.establish_connection(connection_info.clone()).await?;
+        let session = self.webrtc_manager.write().await.establish_connection(connection_info.clone()).await?;
         
         // Create unified connection record
         let unified_connection = UnifiedConnection {
@@ -91,7 +92,7 @@ impl UnifiedCommunicationManager {
     
     /// Establish WebSocket fallback connection
     async fn establish_websocket_connection(&mut self, connection_info: BrowserConnectionInfo) -> BrowserResult<BrowserSession> {
-        let session = self.websocket_manager.establish_connection(connection_info.clone()).await?;
+        let session = self.websocket_manager.write().await.establish_connection(connection_info.clone()).await?;
         
         // Create unified connection record
         let unified_connection = UnifiedConnection {
@@ -112,12 +113,12 @@ impl UnifiedCommunicationManager {
         // Close existing WebRTC connection if it exists
         if let Some(connection) = self.active_connections.get(&session_id) {
             if matches!(connection.protocol, CommunicationProtocol::WebRTC) {
-                self.webrtc_manager.close_connection(session_id).await?;
+                self.webrtc_manager.write().await.close_connection(session_id).await?;
             }
         }
         
         // Establish WebSocket connection
-        let session = self.websocket_manager.establish_connection(connection_info.clone()).await?;
+        let session = self.websocket_manager.write().await.establish_connection(connection_info.clone()).await?;
         
         // Update unified connection record
         let unified_connection = UnifiedConnection {
@@ -170,16 +171,16 @@ impl UnifiedCommunicationManager {
         for (session_id, connection) in self.active_connections.drain() {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
-                    let _ = self.webrtc_manager.close_connection(session_id).await;
+                    let _ = self.webrtc_manager.write().await.close_connection(session_id).await;
                 }
                 CommunicationProtocol::WebSocket => {
-                    let _ = self.websocket_manager.close_connection(session_id).await;
+                    let _ = self.websocket_manager.write().await.close_connection(session_id).await;
                 }
             }
         }
         
-        self.webrtc_manager.shutdown().await?;
-        self.websocket_manager.shutdown().await?;
+        self.webrtc_manager.write().await.shutdown().await?;
+        self.websocket_manager.write().await.shutdown().await?;
         Ok(())
     }
 }
@@ -191,11 +192,11 @@ impl CommunicationInterface for UnifiedCommunicationManager {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
                     // Route to WebRTC data channel
-                    self.webrtc_manager.send_message(session_id, message).await
+                    self.webrtc_manager.write().await.send_message(session_id, message).await
                 }
                 CommunicationProtocol::WebSocket => {
                     // Route to WebSocket connection
-                    self.websocket_manager.send_message(session_id, message).await
+                    self.websocket_manager.write().await.send_message(session_id, message).await
                 }
             }
         } else {
@@ -210,10 +211,10 @@ impl CommunicationInterface for UnifiedCommunicationManager {
         if let Some(connection) = self.active_connections.get(&session_id) {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
-                    self.webrtc_manager.receive_message(session_id).await
+                    self.webrtc_manager.read().await.receive_message(session_id).await
                 }
                 CommunicationProtocol::WebSocket => {
-                    self.websocket_manager.receive_message(session_id).await
+                    self.websocket_manager.read().await.receive_message(session_id).await
                 }
             }
         } else {
@@ -228,10 +229,10 @@ impl CommunicationInterface for UnifiedCommunicationManager {
         if let Some(connection) = self.active_connections.get(&session_id) {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
-                    self.webrtc_manager.is_connected(session_id).await
+                    self.webrtc_manager.read().await.is_connected(session_id).await
                 }
                 CommunicationProtocol::WebSocket => {
-                    self.websocket_manager.is_connected(session_id).await
+                    self.websocket_manager.read().await.is_connected(session_id).await
                 }
             }
         } else {
@@ -243,10 +244,10 @@ impl CommunicationInterface for UnifiedCommunicationManager {
         if let Some(connection) = self.active_connections.get(&session_id) {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
-                    self.webrtc_manager.close_connection(session_id).await
+                    self.webrtc_manager.write().await.close_connection(session_id).await
                 }
                 CommunicationProtocol::WebSocket => {
-                    self.websocket_manager.close_connection(session_id).await
+                    self.websocket_manager.write().await.close_connection(session_id).await
                 }
             }
         } else {
@@ -258,10 +259,10 @@ impl CommunicationInterface for UnifiedCommunicationManager {
         if let Some(connection) = self.active_connections.get(&session_id) {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
-                    self.webrtc_manager.get_connection_stats(session_id).await
+                    self.webrtc_manager.read().await.get_connection_stats(session_id).await
                 }
                 CommunicationProtocol::WebSocket => {
-                    self.websocket_manager.get_connection_stats(session_id).await
+                    self.websocket_manager.read().await.get_connection_stats(session_id).await
                 }
             }
         } else {

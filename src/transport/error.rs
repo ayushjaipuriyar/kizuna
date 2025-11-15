@@ -81,6 +81,12 @@ pub enum TransportError {
     
     #[error("Configuration error: {field} - {reason}")]
     ConfigurationError { field: String, reason: String },
+    
+    #[error("Security error: {details}")]
+    SecurityError { details: String },
+    
+    #[error("Configuration error: {0}")]
+    Configuration(String),
 }
 
 impl TransportError {
@@ -122,6 +128,7 @@ impl TransportError {
             TransportError::CertificateValidationFailed { .. } => ErrorSeverity::Error,
             TransportError::ProtocolVersionMismatch { .. } => ErrorSeverity::Error,
             TransportError::ConfigurationError { .. } => ErrorSeverity::Error,
+            TransportError::SecurityError { .. } => ErrorSeverity::Critical,
             TransportError::ShutdownInProgress => ErrorSeverity::Info,
             _ => ErrorSeverity::Critical,
         }
@@ -181,7 +188,8 @@ impl TransportError {
             TransportError::RelayFailed { .. } => ErrorCategory::Network,
             
             TransportError::AuthenticationFailed { .. } |
-            TransportError::CertificateValidationFailed { .. } => ErrorCategory::Security,
+            TransportError::CertificateValidationFailed { .. } |
+            TransportError::SecurityError { .. } => ErrorCategory::Security,
             
             TransportError::ResourceLimitExceeded { .. } |
             TransportError::BandwidthLimitExceeded { .. } |
@@ -416,6 +424,8 @@ impl Clone for TransportError {
             TransportError::NetworkUnreachable { target } => TransportError::NetworkUnreachable { target: *target },
             TransportError::ShutdownInProgress => TransportError::ShutdownInProgress,
             TransportError::ConfigurationError { field, reason } => TransportError::ConfigurationError { field: field.clone(), reason: reason.clone() },
+            TransportError::SecurityError { details } => TransportError::SecurityError { details: details.clone() },
+            TransportError::Configuration(msg) => TransportError::Configuration(msg.clone()),
         }
     }
 }

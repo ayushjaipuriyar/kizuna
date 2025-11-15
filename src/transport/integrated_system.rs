@@ -3,11 +3,12 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 use super::{
-    PeerId, ConnectionInfo, TransportError,
+    PeerId, ConnectionInfo, TransportError, PeerAddress, Connection,
     ErrorHandler, ErrorHandlerConfig, ErrorContext, ContextualError,
-    TransportLogger, LoggingConfig, LogLevel, LogCategory, ConnectionEvent, SecurityEvent,
+    TransportLogger, LoggingConfig, LogLevel, LogCategory, LogConnectionEvent, LogSecurityEvent,
     PerformanceMonitor, PerformanceConfig, OptimizationRecommendation, HealthStatus,
 };
+use std::net::SocketAddr;
 
 /// Integrated transport system combining error handling, logging, and performance monitoring
 #[derive(Debug)]
@@ -230,12 +231,12 @@ impl IntegratedTransportSystem {
 
         // Log connection event
         self.logger
-            .log_connection_event(ConnectionEvent::Established, connection_info)
+            .log_connection_event(LogConnectionEvent::Established, connection_info)
             .await;
 
         // Log security event if applicable
         self.logger
-            .log_security_event(SecurityEvent::AuthenticationSuccess, Some(&peer_id))
+            .log_security_event(LogSecurityEvent::AuthenticationSuccess, Some(&peer_id))
             .await;
     }
 
@@ -246,7 +247,7 @@ impl IntegratedTransportSystem {
 
         // Log connection event
         self.logger
-            .log_connection_event(ConnectionEvent::Closed, connection_info)
+            .log_connection_event(LogConnectionEvent::Closed, connection_info)
             .await;
     }
 
@@ -454,12 +455,7 @@ impl IntegratedTransportSystem {
         metrics.last_updated = Instant::now();
     }
 
-    /// Create a new integrated transport system with configuration
-    pub async fn new(config: IntegratedSystemConfig) -> Result<Self, TransportError> {
-        let system = Self::with_config(config);
-        system.start().await?;
-        Ok(system)
-    }
+
 
     /// Connect to a peer using the integrated system
     pub async fn connect_to_peer(&self, peer_address: &PeerAddress) -> Result<Box<dyn Connection>, TransportError> {

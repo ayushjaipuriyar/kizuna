@@ -2,8 +2,29 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use std::fmt;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+// Helper functions for SystemTime serialization
+fn serialize_system_time<S>(time: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use std::time::UNIX_EPOCH;
+    let duration = time.duration_since(UNIX_EPOCH)
+        .map_err(|_| serde::ser::Error::custom("SystemTime before UNIX_EPOCH"))?;
+    serializer.serialize_u64(duration.as_secs())
+}
+
+fn deserialize_system_time<'de, D>(deserializer: D) -> Result<SystemTime, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use std::time::UNIX_EPOCH;
+    let secs = u64::deserialize(deserializer)?;
+    Ok(UNIX_EPOCH + Duration::from_secs(secs))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ServiceRecord {
     pub peer_id: String,
     pub name: String,
@@ -11,6 +32,7 @@ pub struct ServiceRecord {
     pub port: u16,
     pub discovery_method: String,
     pub capabilities: HashMap<String, String>,
+    #[serde(serialize_with = "serialize_system_time", deserialize_with = "deserialize_system_time")]
     pub last_seen: SystemTime,
 }
 
