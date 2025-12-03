@@ -55,7 +55,8 @@ pub unsafe fn c_str_to_string(c_str: *const c_char) -> Result<String, std::str::
         return Ok(String::new());
     }
     
-    let c_str = CStr::from_ptr(c_str);
+    // SAFETY: Caller must ensure c_str is a valid null-terminated C string
+    let c_str = unsafe { CStr::from_ptr(c_str) };
     Ok(c_str.to_str()?.to_string())
 }
 

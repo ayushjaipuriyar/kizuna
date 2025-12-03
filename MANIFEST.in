@@ -1,0 +1,24 @@
+# Include Python bindings documentation and examples
+include bindings/python/README.md
+include bindings/python/DEVELOPMENT.md
+include bindings/python/kizuna.pyi
+recursive-include bindings/python/examples *.py
+
+# Include license files
+include LICENSE
+include LICENSE-MIT
+include LICENSE-APACHE
+
+# Include Rust source files
+recursive-include src *.rs
+include Cargo.toml
+include Cargo.lock
+
+# Exclude build artifacts and caches
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude *.dylib
+global-exclude *.dll

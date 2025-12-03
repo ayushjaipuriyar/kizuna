@@ -788,7 +788,7 @@ impl NotificationBackend for LinuxNotificationBackend {
         
         // Show notification
         notification.show()
-            .map_err(|e| ClipboardError::platform("linux", format!("Failed to show notification: {}", e)))?;
+            .map_err(|e| ClipboardError::platform(format!("Failed to show notification on linux: {}", e)))?;
         
         Ok(())
     }

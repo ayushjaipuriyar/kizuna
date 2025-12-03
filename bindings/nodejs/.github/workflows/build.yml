@@ -1,0 +1,164 @@
+name: Build Node.js Bindings
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            build: |
+              cargo build --release --features nodejs
+              strip target/release/libkizuna.so
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            build: |
+              cargo build --release --features nodejs --target aarch64-unknown-linux-gnu
+              aarch64-linux-gnu-strip target/aarch64-unknown-linux-gnu/release/libkizuna.so
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            build: |
+              cargo build --release --features nodejs
+              strip -x target/release/libkizuna.dylib
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            build: |
+              cargo build --release --features nodejs --target aarch64-apple-darwin
+              strip -x target/aarch64-apple-darwin/release/libkizuna.dylib
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: |
+              cargo build --release --features nodejs
+
+    name: Build - ${{ matrix.settings.target }}
+    runs-on: ${{ matrix.settings.host }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: bindings/nodejs/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ matrix.settings.target }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ matrix.settings.target }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ matrix.settings.target }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.settings.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build
+        run: ${{ matrix.settings.build }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: |
+            target/*/release/libkizuna.*
+            target/release/libkizuna.*
+            target/release/kizuna.dll
+          if-no-files-found: error
+
+  test:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [14, 16, 18, 20]
+
+    name: Test - Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: bindings-${{ runner.os == 'Linux' && 'x86_64-unknown-linux-gnu' || runner.os == 'macOS' && 'x86_64-apple-darwin' || 'x86_64-pc-windows-msvc' }}
+          path: target/release
+
+      - name: Install dependencies
+        working-directory: bindings/nodejs
+        run: npm install
+
+      - name: Run tests
+        working-directory: bindings/nodejs
+        run: npm test
+
+  publish:
+    if: github.event_name == 'release'
+    needs: [build, test]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Prepare package
+        working-directory: bindings/nodejs
+        run: |
+          npm install
+          npm run prepublishOnly
+
+      - name: Publish to npm
+        working-directory: bindings/nodejs
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

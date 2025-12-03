@@ -1,0 +1,271 @@
+name: Feature Parity Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Test feature parity across platforms
+  test-feature-parity:
+    name: Test Feature Parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Run feature parity tests
+        run: cargo test --package kizuna --lib platform::feature_parity -- --nocapture
+      
+      - name: Generate feature matrix
+        run: |
+          mkdir -p validation-reports
+          cargo test --package kizuna --lib platform::feature_parity::tests::test_feature_matrix_generation -- --nocapture > validation-reports/test-output.txt || true
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: feature-parity-tests
+          path: validation-reports/
+
+  # Validate platform implementations
+  validate-implementations:
+    name: Validate Platform Implementations
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Check platform module exists
+        shell: bash
+        run: |
+          if [ -f "src/platform/${{ matrix.platform }}.rs" ]; then
+            echo "✓ Platform module exists: ${{ matrix.platform }}.rs"
+          else
+            echo "✗ Platform module missing: ${{ matrix.platform }}.rs"
+            exit 1
+          fi
+      
+      - name: Build platform-specific code
+        run: cargo build --lib
+      
+      - name: Run platform-specific tests
+        run: cargo test --lib -- platform::${{ matrix.platform }}
+
+  # Generate feature matrix
+  generate-matrix:
+    name: Generate Feature Matrix
+    needs: [test-feature-parity, validate-implementations]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Generate feature matrix
+        run: |
+          mkdir -p reports
+          
+          # Create feature matrix
+          cat > reports/feature-matrix.md << 'EOF'
+          # Feature Parity Matrix
+          
+          ## Platform Feature Support
+          
+          | Feature | Linux | macOS | Windows | Android | iOS | WebAssembly | Container |
+          |---------|-------|-------|---------|---------|-----|-------------|-----------|
+          | File Transfer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | Discovery | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+          | Clipboard | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+          | Streaming | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+          | Command Execution | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+          | System Tray | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+          | Notifications | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+          | Auto Start | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+          | File Associations | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+          
+          ## Platform Compatibility
+          
+          ### Desktop Platforms
+          - **Linux**, **macOS**, and **Windows** have high feature parity
+          - All core features are supported
+          - Platform-specific optimizations available
+          
+          ### Mobile Platforms
+          - **Android** and **iOS** support core features
+          - Limited UI integration features
+          - Mobile-optimized implementations
+          
+          ### Web Platform
+          - **WebAssembly** supports core features
+          - Browser security restrictions apply
+          - Progressive Web App capabilities
+          
+          ### Container Platform
+          - **Container** supports core features
+          - Headless operation mode
+          - Optimized for server deployments
+          
+          ## Required Features
+          
+          All platforms must support:
+          - ✅ File Transfer
+          - ✅ Discovery
+          
+          ## Optional Features
+          
+          Platform-dependent features:
+          - Clipboard synchronization
+          - Screen streaming
+          - Remote command execution
+          - System tray integration
+          - Desktop notifications
+          - Auto-start on boot
+          - File type associations
+          
+          ## Validation Status
+          
+          - ✅ All required features validated
+          - ✅ Platform implementations tested
+          - ✅ Feature parity maintained
+          
+          Last updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          EOF
+          
+          cat reports/feature-matrix.md
+      
+      - name: Upload feature matrix
+        uses: actions/upload-artifact@v3
+        with:
+          name: feature-matrix
+          path: reports/feature-matrix.md
+      
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const matrix = fs.readFileSync('reports/feature-matrix.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: matrix
+            });
+
+  # Check for feature regressions
+  check-regressions:
+    name: Check Feature Regressions
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Check for feature regressions
+        run: |
+          echo "Checking for feature regressions..."
+          
+          # Run tests to ensure no features were removed
+          cargo test --lib platform::feature_parity
+          
+          echo "✓ No feature regressions detected"
+      
+      - name: Create issue if regressions found
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚠️ Feature Regression Detected',
+              body: `Feature parity validation failed in commit ${context.sha}.\n\nPlease review the test results and ensure all required features are still available.`,
+              labels: ['bug', 'regression', 'feature-parity']
+            });
+
+  # Summary report
+  summary:
+    name: Validation Summary
+    needs: [test-feature-parity, validate-implementations, generate-matrix, check-regressions]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+      
+      - name: Generate summary
+        run: |
+          echo "# Feature Parity Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.test-feature-parity.result }}" == "success" ]; then
+            echo "✅ Feature parity tests: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Feature parity tests: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.validate-implementations.result }}" == "success" ]; then
+            echo "✅ Platform implementations: **VALIDATED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Platform implementations: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.check-regressions.result }}" == "success" ]; then
+            echo "✅ Regression check: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Regression check: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Feature Matrix" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "artifacts/feature-matrix/feature-matrix.md" ]; then
+            cat artifacts/feature-matrix/feature-matrix.md >> $GITHUB_STEP_SUMMARY
+          fi

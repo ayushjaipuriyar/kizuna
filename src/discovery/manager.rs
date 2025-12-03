@@ -20,6 +20,57 @@ pub struct StrategyConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct TimeoutConfig {
+    pub performance_test_timeout: Duration,
+    pub adaptive_timeout_enabled: bool,
+}
+
+impl Default for TimeoutConfig {
+    fn default() -> Self {
+        Self {
+            performance_test_timeout: Duration::from_secs(10),
+            adaptive_timeout_enabled: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MonitoringConfig {
+    pub peer_ttl: Duration,
+    pub concurrent_discovery: bool,
+    pub max_concurrent_strategies: usize,
+    pub performance_test_timeout: Duration,
+    pub adaptive_timeout: bool,
+    pub fallback_enabled: bool,
+    pub retry_config: RetryConfig,
+    pub error_recovery_config: ErrorRecoveryConfig,
+}
+
+impl Default for MonitoringConfig {
+    fn default() -> Self {
+        Self {
+            peer_ttl: Duration::from_secs(300),
+            concurrent_discovery: false,
+            max_concurrent_strategies: 3,
+            performance_test_timeout: Duration::from_secs(10),
+            adaptive_timeout: true,
+            fallback_enabled: true,
+            retry_config: RetryConfig::default(),
+            error_recovery_config: ErrorRecoveryConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TimingMetrics {
+    pub average_time: Duration,
+    pub min_time: Duration,
+    pub max_time: Duration,
+    pub total_attempts: u64,
+    pub successful_attempts: u64,
+}
+
+#[derive(Debug, Clone)]
 pub struct MdnsConfig {
     pub peer_id: String,
     pub device_name: String,
@@ -1792,6 +1843,156 @@ impl DiscoveryManager {
         Ok(())
     }
 
+    /// Get timing metrics for a specific strategy
+    pub async fn get_strategy_timing_metrics(&self, strategy_name: &str) -> Option<TimingMetrics> {
+        let monitor = self.performance_monitor.read().await;
+        monitor.strategy_metrics.get(strategy_name).map(|metrics| {
+            TimingMetrics {
+                average_time: metrics.average_discovery_time,
+                min_time: metrics.min_discovery_time,
+                max_time: metrics.max_discovery_time,
+                total_attempts: metrics.total_discoveries,
+                successful_attempts: metrics.successful_discoveries,
+            }
+        })
+    }
+
+    /// Get global timing metrics across all strategies
+    pub async fn get_global_timing_metrics(&self) -> TimingMetrics {
+        let monitor = self.performance_monitor.read().await;
+        TimingMetrics {
+            average_time: monitor.global_metrics.average_discovery_time,
+            min_time: monitor.global_metrics.min_discovery_time,
+            max_time: monitor.global_metrics.max_discovery_time,
+            total_attempts: monitor.global_metrics.total_discoveries,
+            successful_attempts: monitor.global_metrics.successful_discoveries,
+        }
+    }
+
+    /// Get cache statistics
+    pub async fn get_cache_stats(&self) -> CacheStats {
+        let monitor = self.performance_monitor.read().await;
+        monitor.peer_cache_stats.clone()
+    }
+
+    /// Get resource usage statistics
+    pub async fn get_resource_usage(&self) -> ResourceUsage {
+        let monitor = self.performance_monitor.read().await;
+        monitor.resource_usage.clone()
+    }
+
+    /// Update resource usage statistics (should be called periodically)
+    pub async fn update_resource_usage(&self) {
+        let mut monitor = self.performance_monitor.write().await;
+        
+        // Update memory usage based on cache size
+        let peers = self.discovered_peers.read().await;
+        let estimated_memory = peers.len() * std::mem::size_of::<ServiceRecord>();
+        
+        monitor.resource_usage.memory_usage_bytes = estimated_memory as u64;
+        monitor.resource_usage.last_updated = SystemTime::now();
+        
+        // Note: CPU usage, network connections, file descriptors, and thread count
+        // would require platform-specific system calls to measure accurately
+        // For now, we provide placeholders that can be filled in with actual measurements
+    }
+
+    /// Get configuration for timeouts
+    pub fn get_timeout_config(&self) -> TimeoutConfig {
+        TimeoutConfig {
+            performance_test_timeout: self.performance_test_timeout,
+            adaptive_timeout_enabled: self.adaptive_timeout,
+        }
+    }
+
+    /// Set timeout configuration
+    pub fn set_timeout_config(&mut self, config: TimeoutConfig) {
+        self.performance_test_timeout = config.performance_test_timeout;
+        self.adaptive_timeout = config.adaptive_timeout_enabled;
+    }
+
+    /// Get retry configuration
+    pub fn get_retry_config(&self) -> RetryConfig {
+        self.retry_config.clone()
+    }
+
+    /// Get error recovery configuration
+    pub fn get_error_recovery_config(&self) -> ErrorRecoveryConfig {
+        self.error_recovery_config.clone()
+    }
+
+    /// Get comprehensive monitoring configuration
+    pub fn get_monitoring_config(&self) -> MonitoringConfig {
+        MonitoringConfig {
+            peer_ttl: self.peer_ttl,
+            concurrent_discovery: self.concurrent_discovery,
+            max_concurrent_strategies: self.max_concurrent_strategies,
+            performance_test_timeout: self.performance_test_timeout,
+            adaptive_timeout: self.adaptive_timeout,
+            fallback_enabled: self.fallback_enabled,
+            retry_config: self.retry_config.clone(),
+            error_recovery_config: self.error_recovery_config.clone(),
+        }
+    }
+
+    /// Set comprehensive monitoring configuration
+    pub fn set_monitoring_config(&mut self, config: MonitoringConfig) {
+        self.peer_ttl = config.peer_ttl;
+        self.concurrent_discovery = config.concurrent_discovery;
+        self.max_concurrent_strategies = config.max_concurrent_strategies;
+        self.performance_test_timeout = config.performance_test_timeout;
+        self.adaptive_timeout = config.adaptive_timeout;
+        self.fallback_enabled = config.fallback_enabled;
+        self.retry_config = config.retry_config;
+        self.error_recovery_config = config.error_recovery_config;
+    }
+
+    /// Start automatic performance monitoring with periodic updates
+    pub async fn start_performance_monitoring(&self, interval: Duration) -> tokio::task::JoinHandle<()> {
+        let manager_clone = Arc::new(self.clone_for_monitoring());
+        
+        tokio::spawn(async move {
+            let mut interval_timer = tokio::time::interval(interval);
+            
+            loop {
+                interval_timer.tick().await;
+                
+                // Update resource usage
+                manager_clone.update_resource_usage().await;
+                
+                // Perform automatic cleanup
+                let _ = manager_clone.configure_automatic_cleanup().await;
+                
+                // Update cache monitoring stats
+                manager_clone.update_cache_monitoring_stats().await;
+            }
+        })
+    }
+
+    /// Helper method to create a clone suitable for monitoring tasks
+    fn clone_for_monitoring(&self) -> Self {
+        Self {
+            strategies: Vec::new(), // Don't clone strategies for monitoring
+            auto_select: self.auto_select,
+            active_strategy: self.active_strategy.clone(),
+            discovered_peers: Arc::clone(&self.discovered_peers),
+            peer_ttl: self.peer_ttl,
+            strategy_stats: Arc::clone(&self.strategy_stats),
+            concurrent_discovery: self.concurrent_discovery,
+            max_concurrent_strategies: self.max_concurrent_strategies,
+            performance_test_timeout: self.performance_test_timeout,
+            network_condition_cache: Arc::clone(&self.network_condition_cache),
+            last_network_check: Arc::clone(&self.last_network_check),
+            fallback_enabled: self.fallback_enabled,
+            adaptive_timeout: self.adaptive_timeout,
+            retry_config: self.retry_config.clone(),
+            error_recovery_config: self.error_recovery_config.clone(),
+            error_history: Arc::clone(&self.error_history),
+            circuit_breakers: Arc::clone(&self.circuit_breakers),
+            performance_monitor: Arc::clone(&self.performance_monitor),
+        }
+    }
+
     /// Register all available discovery strategies
     pub async fn register_all_strategies(&mut self) -> Result<(), DiscoveryError> {
         use crate::discovery::strategies::{
@@ -2721,5 +2922,270 @@ mod tests {
         let peers = result.unwrap();
         assert_eq!(peers.len(), 1);
         assert_eq!(peers[0].peer_id, "peer-123");
+    }
+
+    // Performance Monitoring Tests
+
+    #[tokio::test]
+    async fn test_timing_metrics_collection() {
+        let mut manager = DiscoveryManager::new();
+        
+        let peer = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let strategy = MockDiscovery::new("test_strategy", true, 50)
+            .with_peers(vec![peer]);
+        
+        manager.add_strategy_async(Box::new(strategy)).await;
+        
+        // Perform discovery
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Check timing metrics
+        let metrics = manager.get_strategy_timing_metrics("test_strategy").await;
+        assert!(metrics.is_some());
+        
+        let metrics = metrics.unwrap();
+        assert_eq!(metrics.total_attempts, 1);
+        assert_eq!(metrics.successful_attempts, 1);
+        assert!(metrics.average_time > Duration::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_global_timing_metrics() {
+        let mut manager = DiscoveryManager::new();
+        
+        let peer1 = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let peer2 = ServiceRecord::new("peer-2".to_string(), "Device 2".to_string(), 8080);
+        
+        let strategy1 = MockDiscovery::new("strategy1", true, 50)
+            .with_peers(vec![peer1]);
+        let strategy2 = MockDiscovery::new("strategy2", true, 60)
+            .with_peers(vec![peer2]);
+        
+        manager.add_strategy_async(Box::new(strategy1)).await;
+        manager.add_strategy_async(Box::new(strategy2)).await;
+        
+        // Perform multiple discoveries
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Check global metrics
+        let global_metrics = manager.get_global_timing_metrics().await;
+        assert!(global_metrics.total_attempts >= 2);
+        assert!(global_metrics.successful_attempts >= 2);
+        assert!(global_metrics.average_time > Duration::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_cache_statistics() {
+        let mut manager = DiscoveryManager::new();
+        manager.set_peer_ttl(Duration::from_secs(60));
+        
+        let peer = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let strategy = MockDiscovery::new("test_strategy", true, 50)
+            .with_peers(vec![peer]);
+        
+        manager.add_strategy_async(Box::new(strategy)).await;
+        
+        // Discover peers
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Update cache stats
+        manager.update_cache_monitoring_stats().await;
+        
+        // Check cache statistics
+        let cache_stats = manager.get_cache_stats().await;
+        assert_eq!(cache_stats.total_entries, 1);
+        assert_eq!(cache_stats.active_entries, 1);
+        assert_eq!(cache_stats.expired_entries, 0);
+        assert!(cache_stats.memory_usage_bytes > 0);
+    }
+
+    #[tokio::test]
+    async fn test_resource_usage_monitoring() {
+        let mut manager = DiscoveryManager::new();
+        
+        let peer = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let strategy = MockDiscovery::new("test_strategy", true, 50)
+            .with_peers(vec![peer]);
+        
+        manager.add_strategy_async(Box::new(strategy)).await;
+        
+        // Discover peers
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Update resource usage
+        manager.update_resource_usage().await;
+        
+        // Check resource usage
+        let resource_usage = manager.get_resource_usage().await;
+        assert!(resource_usage.memory_usage_bytes > 0);
+        assert!(resource_usage.last_updated <= SystemTime::now());
+    }
+
+    #[tokio::test]
+    async fn test_timeout_configuration() {
+        let mut manager = DiscoveryManager::new();
+        
+        // Get default timeout config
+        let default_config = manager.get_timeout_config();
+        assert_eq!(default_config.performance_test_timeout, Duration::from_secs(10));
+        assert!(default_config.adaptive_timeout_enabled);
+        
+        // Set custom timeout config
+        let custom_config = TimeoutConfig {
+            performance_test_timeout: Duration::from_secs(5),
+            adaptive_timeout_enabled: false,
+        };
+        manager.set_timeout_config(custom_config.clone());
+        
+        // Verify config was updated
+        let updated_config = manager.get_timeout_config();
+        assert_eq!(updated_config.performance_test_timeout, Duration::from_secs(5));
+        assert!(!updated_config.adaptive_timeout_enabled);
+    }
+
+    #[tokio::test]
+    async fn test_retry_configuration() {
+        let manager = DiscoveryManager::new();
+        
+        // Get default retry config
+        let retry_config = manager.get_retry_config();
+        assert_eq!(retry_config.max_attempts, 3);
+        assert_eq!(retry_config.base_delay, Duration::from_millis(100));
+        assert!(retry_config.jitter);
+    }
+
+    #[tokio::test]
+    async fn test_monitoring_configuration() {
+        let mut manager = DiscoveryManager::new();
+        
+        // Get default monitoring config
+        let default_config = manager.get_monitoring_config();
+        assert_eq!(default_config.peer_ttl, Duration::from_secs(300));
+        assert!(!default_config.concurrent_discovery);
+        assert_eq!(default_config.max_concurrent_strategies, 3);
+        
+        // Set custom monitoring config
+        let custom_config = MonitoringConfig {
+            peer_ttl: Duration::from_secs(600),
+            concurrent_discovery: true,
+            max_concurrent_strategies: 5,
+            performance_test_timeout: Duration::from_secs(15),
+            adaptive_timeout: false,
+            fallback_enabled: false,
+            retry_config: RetryConfig {
+                max_attempts: 5,
+                base_delay: Duration::from_millis(200),
+                max_delay: Duration::from_secs(60),
+                backoff_multiplier: 3.0,
+                jitter: false,
+            },
+            error_recovery_config: ErrorRecoveryConfig::default(),
+        };
+        manager.set_monitoring_config(custom_config.clone());
+        
+        // Verify config was updated
+        let updated_config = manager.get_monitoring_config();
+        assert_eq!(updated_config.peer_ttl, Duration::from_secs(600));
+        assert!(updated_config.concurrent_discovery);
+        assert_eq!(updated_config.max_concurrent_strategies, 5);
+        assert_eq!(updated_config.retry_config.max_attempts, 5);
+    }
+
+    #[tokio::test]
+    async fn test_performance_report_generation() {
+        let mut manager = DiscoveryManager::new();
+        
+        let peer = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let strategy = MockDiscovery::new("test_strategy", true, 50)
+            .with_peers(vec![peer]);
+        
+        manager.add_strategy_async(Box::new(strategy)).await;
+        
+        // Perform discovery
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Generate performance report
+        let report = manager.get_performance_report().await;
+        
+        // Verify report contents
+        assert!(report.global_metrics.total_discoveries > 0);
+        assert!(report.global_metrics.successful_discoveries > 0);
+        assert!(!report.top_strategies.is_empty());
+        assert_eq!(report.top_strategies[0].0, "test_strategy");
+    }
+
+    #[tokio::test]
+    async fn test_strategy_performance_metrics() {
+        let mut manager = DiscoveryManager::new();
+        
+        let peer = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let strategy = MockDiscovery::new("test_strategy", true, 50)
+            .with_peers(vec![peer]);
+        
+        manager.add_strategy_async(Box::new(strategy)).await;
+        
+        // Perform discovery
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Get strategy-specific performance metrics
+        let metrics = manager.get_strategy_performance("test_strategy").await;
+        assert!(metrics.is_some());
+        
+        let metrics = metrics.unwrap();
+        assert_eq!(metrics.total_discoveries, 1);
+        assert_eq!(metrics.successful_discoveries, 1);
+        assert_eq!(metrics.total_peers_found, 1);
+    }
+
+    #[tokio::test]
+    async fn test_optimization_recommendations() {
+        let mut manager = DiscoveryManager::new();
+        
+        // Add a failing strategy to trigger recommendations
+        let failing_strategy = MockDiscovery::new("failing", true, 50)
+            .with_failure();
+        
+        manager.add_strategy_async(Box::new(failing_strategy)).await;
+        
+        // Perform multiple failed discoveries
+        for _ in 0..5 {
+            let _ = manager.discover_peers(Duration::from_secs(1)).await;
+        }
+        
+        // Get optimization recommendations
+        let recommendations = manager.get_optimization_recommendations().await;
+        assert!(!recommendations.is_empty());
+        
+        // Should recommend disabling the failing strategy
+        let has_failing_strategy_recommendation = recommendations.iter()
+            .any(|r| r.contains("failing"));
+        assert!(has_failing_strategy_recommendation);
+    }
+
+    #[tokio::test]
+    async fn test_performance_metrics_reset() {
+        let mut manager = DiscoveryManager::new();
+        
+        let peer = ServiceRecord::new("peer-1".to_string(), "Device 1".to_string(), 8080);
+        let strategy = MockDiscovery::new("test_strategy", true, 50)
+            .with_peers(vec![peer]);
+        
+        manager.add_strategy_async(Box::new(strategy)).await;
+        
+        // Perform discovery
+        let _ = manager.discover_peers(Duration::from_secs(5)).await;
+        
+        // Verify metrics exist
+        let metrics_before = manager.get_global_timing_metrics().await;
+        assert!(metrics_before.total_attempts > 0);
+        
+        // Reset metrics
+        manager.reset_performance_metrics().await;
+        
+        // Verify metrics were reset
+        let metrics_after = manager.get_global_timing_metrics().await;
+        assert_eq!(metrics_after.total_attempts, 0);
+        assert_eq!(metrics_after.successful_attempts, 0);
     }
 }

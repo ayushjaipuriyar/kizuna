@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kizuna - Cross-platform device connectivity and file sharing">
+    <meta name="theme-color" content="#4a90e2">
+
+    <title>Kizuna</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        #app {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        h1 {
+            color: #4a90e2;
+            margin-bottom: 1rem;
+        }
+
+        #status {
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .capability {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .capability:last-child {
+            border-bottom: none;
+        }
+
+        .available {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .unavailable {
+            color: #f44336;
+        }
+
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #357abd;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4a90e2;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div id="loading">
+            <div class="spinner"></div>
+            <p>Loading Kizuna...</p>
+        </div>
+
+        <div id="content" class="hidden">
+            <h1>🔗 Kizuna</h1>
+            <p>Cross-platform device connectivity and file sharing</p>
+
+            <div id="status">
+                <h3>Browser Capabilities</h3>
+                <div id="capabilities"></div>
+            </div>
+
+            <div>
+                <button id="init-btn">Initialize</button>
+                <button id="notify-btn" disabled>Test Notification</button>
+                <button id="install-btn" class="hidden">Install PWA</button>
+            </div>
+
+            <div id="info" style="margin-top: 1rem; font-size: 0.9rem; color: #666;"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { KizunaWasm } from './kizuna.js';
+
+        let kizuna = null;
+        let deferredPrompt = null;
+
+        async function loadWasm() {
+            try {
+                await init();
+                kizuna = new KizunaWasm();
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+
+                displayCapabilities();
+                setupEventListeners();
+                registerServiceWorker();
+
+            } catch (error) {
+                console.error('Failed to load WASM:', error);
+                document.getElementById('loading').innerHTML =
+                    '<p style="color: red;">Failed to load application. Please refresh the page.</p>';
+            }
+        }
+
+        function displayCapabilities() {
+            const capabilities = kizuna.get_capabilities();
+            const container = document.getElementById('capabilities');
+
+            const capList = [
+                { name: 'Notifications', key: 'notifications' },
+                { name: 'Service Worker', key: 'serviceWorker' },
+                { name: 'Local Storage', key: 'localStorage' },
+                { name: 'WebRTC', key: 'webrtc' },
+                { name: 'WebSocket', key: 'websocket' },
+                { name: 'Clipboard API', key: 'clipboard' },
+            ];
+
+            container.innerHTML = capList.map(cap => {
+                const available = capabilities[cap.key];
+                return `
+                    <div class="capability">
+                        <span>${cap.name}</span>
+                        <span class="${available ? 'available' : 'unavailable'}">
+                            ${available ? '✓ Available' : '✗ Not Available'}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            // Enable notification button if supported
+            if (capabilities.notifications) {
+                document.getElementById('notify-btn').disabled = false;
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('init-btn').addEventListener('click', async () => {
+                try {
+                    await kizuna.initialize();
+                    document.getElementById('info').innerHTML =
+                        '<p style="color: green;">✓ Kizuna initialized successfully!</p>';
+                } catch (error) {
+                    document.getElementById('info').innerHTML =
+                        `<p style="color: red;">✗ Initialization failed: ${error}</p>`;
+                }
+            });
+
+            document.getElementById('notify-btn').addEventListener('click', async () => {
+                try {
+                    await kizuna.show_notification('Kizuna', 'Test notification from Kizuna!');
+                } catch (error) {
+                    console.error('Notification failed:', error);
+                    alert('Notification permission denied or not supported');
+                }
+            });
+
+            document.getElementById('install-btn').addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`User response to install prompt: ${outcome}`);
+                    deferredPrompt = null;
+                    document.getElementById('install-btn').classList.add('hidden');
+                }
+            });
+        }
+
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('Service Worker registered:', registration);
+                } catch (error) {
+                    console.error('Service Worker registration failed:', error);
+                }
+            }
+        }
+
+        // PWA install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('install-btn').classList.remove('hidden');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA installed');
+            deferredPrompt = null;
+        });
+
+        // Load WASM on page load
+        loadWasm();
+    </script>
+</body>
+
+</html>

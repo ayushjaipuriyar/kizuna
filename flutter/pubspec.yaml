@@ -1,0 +1,52 @@
+name: kizuna
+description: Flutter plugin for Kizuna - seamless peer-to-peer connectivity for file sharing, screen streaming, and device communication
+version: 0.1.0
+homepage: https://github.com/kizuna/kizuna
+repository: https://github.com/kizuna/kizuna
+issue_tracker: https://github.com/kizuna/kizuna/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.0
+  ffi: ^2.0.0
+  path: ^1.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  ffigen: ^9.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.kizuna.flutter
+        pluginClass: KizunaPlugin
+      ios:
+        pluginClass: KizunaPlugin
+      linux:
+        pluginClass: KizunaPlugin
+      macos:
+        pluginClass: KizunaPlugin
+      windows:
+        pluginClass: KizunaPlugin
+
+# Platform-specific configurations
+platforms:
+  android:
+    minSdkVersion: 21
+    targetSdkVersion: 34
+  ios:
+    deploymentTarget: '12.0'
+  macos:
+    deploymentTarget: '10.14'
+  windows:
+    minVersion: '10.0.17763.0'
+  linux:
+    minVersion: 'Ubuntu 20.04'

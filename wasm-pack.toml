@@ -1,0 +1,13 @@
+# wasm-pack configuration for Kizuna
+
+[package]
+name = "kizuna"
+description = "Cross-platform device connectivity and file sharing"
+repository = "https://github.com/kizuna/kizuna"
+license = "MIT"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-mutable-globals"]
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false

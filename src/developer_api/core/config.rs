@@ -20,6 +20,9 @@ pub struct KizunaConfig {
     
     /// Plugin configurations
     pub plugins: Vec<PluginConfig>,
+    
+    /// Number of runtime worker threads (None = default based on CPU cores)
+    pub runtime_threads: Option<usize>,
 }
 
 impl Default for KizunaConfig {
@@ -30,6 +33,7 @@ impl Default for KizunaConfig {
             security: SecurityConfig::default(),
             networking: NetworkConfig::default(),
             plugins: Vec::new(),
+            runtime_threads: None,
         }
     }
 }

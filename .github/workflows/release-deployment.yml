@@ -1,0 +1,375 @@
+name: Release and Deployment
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '0.1.0'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Build all platforms
+  build-release:
+    name: Build Release (${{ matrix.platform }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            platform: linux
+            arch: aarch64
+            target: aarch64-unknown-linux-gnu
+          # macOS
+          - os: macos-latest
+            platform: macos
+            arch: x86_64
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            platform: macos
+            arch: aarch64
+            target: aarch64-apple-darwin
+          # Windows
+          - os: windows-latest
+            platform: windows
+            arch: x86_64
+            target: x86_64-pc-windows-msvc
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+      
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+      
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p dist/${{ matrix.platform }}/${{ matrix.target }}
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            cp target/${{ matrix.target }}/release/kizuna.exe dist/${{ matrix.platform }}/${{ matrix.target }}/
+          else
+            cp target/${{ matrix.target }}/release/kizuna dist/${{ matrix.platform }}/${{ matrix.target }}/
+          fi
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kizuna-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/${{ matrix.platform }}/${{ matrix.target }}/
+
+  # Package for Linux
+  package-linux:
+    name: Package Linux
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: kizuna-linux-*
+          path: dist/linux/
+      
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev rpm
+      
+      - name: Create Debian packages
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          
+          # x86_64 package
+          mkdir -p packages/linux/deb/kizuna_${VERSION}_amd64/DEBIAN
+          mkdir -p packages/linux/deb/kizuna_${VERSION}_amd64/usr/bin
+          
+          cp dist/linux/kizuna-linux-x86_64/x86_64-unknown-linux-gnu/kizuna \
+             packages/linux/deb/kizuna_${VERSION}_amd64/usr/bin/
+          chmod +x packages/linux/deb/kizuna_${VERSION}_amd64/usr/bin/kizuna
+          
+          cat > packages/linux/deb/kizuna_${VERSION}_amd64/DEBIAN/control << EOF
+          Package: kizuna
+          Version: ${VERSION}
+          Section: net
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Kizuna Team <team@kizuna.dev>
+          Description: Cross-platform device connectivity
+           Kizuna provides seamless connectivity between devices.
+          EOF
+          
+          dpkg-deb --build packages/linux/deb/kizuna_${VERSION}_amd64
+          
+          # ARM64 package
+          mkdir -p packages/linux/deb/kizuna_${VERSION}_arm64/DEBIAN
+          mkdir -p packages/linux/deb/kizuna_${VERSION}_arm64/usr/bin
+          
+          cp dist/linux/kizuna-linux-aarch64/aarch64-unknown-linux-gnu/kizuna \
+             packages/linux/deb/kizuna_${VERSION}_arm64/usr/bin/
+          chmod +x packages/linux/deb/kizuna_${VERSION}_arm64/usr/bin/kizuna
+          
+          cat > packages/linux/deb/kizuna_${VERSION}_arm64/DEBIAN/control << EOF
+          Package: kizuna
+          Version: ${VERSION}
+          Section: net
+          Priority: optional
+          Architecture: arm64
+          Maintainer: Kizuna Team <team@kizuna.dev>
+          Description: Cross-platform device connectivity
+           Kizuna provides seamless connectivity between devices.
+          EOF
+          
+          dpkg-deb --build packages/linux/deb/kizuna_${VERSION}_arm64
+      
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-packages
+          path: packages/linux/
+
+  # Package for macOS
+  package-macos:
+    name: Package macOS
+    needs: build-release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: kizuna-macos-*
+          path: dist/macos/
+      
+      - name: Create universal binary
+        run: |
+          mkdir -p packages/macos
+          lipo -create \
+            dist/macos/kizuna-macos-x86_64/x86_64-apple-darwin/kizuna \
+            dist/macos/kizuna-macos-aarch64/aarch64-apple-darwin/kizuna \
+            -output packages/macos/kizuna
+      
+      - name: Create app bundle
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          
+          mkdir -p packages/macos/Kizuna.app/Contents/MacOS
+          mkdir -p packages/macos/Kizuna.app/Contents/Resources
+          
+          cp packages/macos/kizuna packages/macos/Kizuna.app/Contents/MacOS/
+          chmod +x packages/macos/Kizuna.app/Contents/MacOS/kizuna
+          
+          cat > packages/macos/Kizuna.app/Contents/Info.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>kizuna</string>
+              <key>CFBundleIdentifier</key>
+              <string>dev.kizuna.Kizuna</string>
+              <key>CFBundleName</key>
+              <string>Kizuna</string>
+              <key>CFBundleVersion</key>
+              <string>${VERSION}</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>10.15</string>
+          </dict>
+          </plist>
+          EOF
+      
+      - name: Code sign (if credentials available)
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+          codesign --force --deep --sign "Developer ID Application" packages/macos/Kizuna.app
+      
+      - name: Create DMG
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          
+          hdiutil create -volname "Kizuna" \
+            -srcfolder packages/macos/Kizuna.app \
+            -ov -format UDZO \
+            packages/macos/Kizuna-${VERSION}.dmg
+      
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-packages
+          path: packages/macos/*.dmg
+
+  # Package for Windows
+  package-windows:
+    name: Package Windows
+    needs: build-release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: kizuna-windows-*
+          path: dist/windows/
+      
+      - name: Create ZIP archive
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          
+          New-Item -ItemType Directory -Force -Path packages/windows
+          
+          Compress-Archive -Path dist/windows/kizuna-windows-x86_64/x86_64-pc-windows-msvc/kizuna.exe `
+                          -DestinationPath packages/windows/kizuna-${version}-windows-x86_64.zip
+      
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-packages
+          path: packages/windows/
+
+  # Build and push container images
+  package-container:
+    name: Package Container
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    needs: [package-linux, package-macos, package-windows, package-container]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all packages
+        uses: actions/download-artifact@v3
+        with:
+          path: packages/
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          
+          cat > release_notes.md << EOF
+          # Kizuna ${VERSION}
+          
+          ## Downloads
+          
+          ### Linux
+          - Debian/Ubuntu: \`kizuna_${VERSION}_amd64.deb\`, \`kizuna_${VERSION}_arm64.deb\`
+          
+          ### macOS
+          - Universal DMG: \`Kizuna-${VERSION}.dmg\`
+          
+          ### Windows
+          - ZIP archive: \`kizuna-${VERSION}-windows-x86_64.zip\`
+          
+          ### Container
+          - Docker: \`ghcr.io/${{ github.repository }}:${VERSION}\`
+          
+          ## Installation
+          
+          ### Linux (Debian/Ubuntu)
+          \`\`\`bash
+          sudo dpkg -i kizuna_${VERSION}_amd64.deb
+          \`\`\`
+          
+          ### macOS
+          1. Download and open the DMG file
+          2. Drag Kizuna to Applications
+          
+          ### Windows
+          1. Download and extract the ZIP file
+          2. Run kizuna.exe
+          
+          ### Container
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}:${VERSION}
+          docker run -it ghcr.io/${{ github.repository }}:${VERSION}
+          \`\`\`
+          EOF
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            packages/linux-packages/**/*.deb
+            packages/macos-packages/**/*.dmg
+            packages/windows-packages/**/*.zip
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -267,13 +267,18 @@ pub trait EventListener: Send + Sync {
 /// Event emitter for publishing events
 pub struct EventEmitter {
     listeners: Vec<Box<dyn EventListener>>,
+    event_tx: Arc<tokio::sync::broadcast::Sender<KizunaEvent>>,
 }
+
+use std::sync::Arc;
 
 impl EventEmitter {
     /// Creates a new event emitter
     pub fn new() -> Self {
+        let (event_tx, _) = tokio::sync::broadcast::channel(100);
         Self {
             listeners: Vec::new(),
+            event_tx: Arc::new(event_tx),
         }
     }
     
@@ -284,8 +289,24 @@ impl EventEmitter {
     
     /// Emits an event to all listeners
     pub async fn emit(&self, event: KizunaEvent) {
+        // Emit to broadcast channel
+        let _ = self.event_tx.send(event.clone());
+        
+        // Emit to registered listeners
         for listener in &self.listeners {
             listener.on_event(event.clone()).await;
+        }
+    }
+    
+    /// Subscribes to events as a stream
+    pub fn subscribe(&self) -> impl futures::Stream<Item = KizunaEvent> + Send {
+        let tx = Arc::clone(&self.event_tx);
+        let mut rx = tx.subscribe();
+        
+        async_stream::stream! {
+            while let Ok(event) = rx.recv().await {
+                yield event;
+            }
         }
     }
 }

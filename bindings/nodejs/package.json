@@ -1,0 +1,90 @@
+{
+    "name": "kizuna-node",
+    "version": "0.1.0",
+    "description": "Node.js bindings for Kizuna - peer-to-peer file transfer, streaming, and command execution",
+    "main": "index.js",
+    "types": "index.d.ts",
+    "napi": {
+        "name": "kizuna",
+        "triples": {
+            "defaults": true,
+            "additional": [
+                "x86_64-unknown-linux-gnu",
+                "aarch64-unknown-linux-gnu",
+                "x86_64-apple-darwin",
+                "aarch64-apple-darwin",
+                "x86_64-pc-windows-msvc"
+            ]
+        }
+    },
+    "scripts": {
+        "build": "bash scripts/build.sh release",
+        "build:debug": "bash scripts/build.sh debug",
+        "build:windows": "scripts\\build.bat release",
+        "build:windows:debug": "scripts\\build.bat debug",
+        "prepublishOnly": "npm run build && npm test",
+        "test": "node test/test.js",
+        "test:advanced": "node examples/advanced.js",
+        "version": "node scripts/version.js",
+        "docs": "jsdoc -c jsdoc.json",
+        "clean": "rm -rf target/ node_modules/ *.node",
+        "install": "node -e \"try { require('./index.js') } catch (e) { console.log('Native module will be built on first use') }\""
+    },
+    "keywords": [
+        "kizuna",
+        "p2p",
+        "peer-to-peer",
+        "file-transfer",
+        "streaming",
+        "discovery",
+        "mdns",
+        "webrtc",
+        "napi",
+        "rust",
+        "native",
+        "cross-platform",
+        "encryption",
+        "secure"
+    ],
+    "author": "Kizuna Contributors",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/kizuna/kizuna.git",
+        "directory": "bindings/nodejs"
+    },
+    "bugs": {
+        "url": "https://github.com/kizuna/kizuna/issues"
+    },
+    "homepage": "https://github.com/kizuna/kizuna#readme",
+    "engines": {
+        "node": ">= 14.0.0"
+    },
+    "os": [
+        "linux",
+        "darwin",
+        "win32"
+    ],
+    "cpu": [
+        "x64",
+        "arm64"
+    ],
+    "devDependencies": {
+        "@napi-rs/cli": "^2.18.0",
+        "jsdoc": "^4.0.0"
+    },
+    "optionalDependencies": {
+        "kizuna-linux-x64-gnu": "0.1.0",
+        "kizuna-linux-arm64-gnu": "0.1.0",
+        "kizuna-darwin-x64": "0.1.0",
+        "kizuna-darwin-arm64": "0.1.0",
+        "kizuna-win32-x64-msvc": "0.1.0"
+    },
+    "files": [
+        "index.js",
+        "index.d.ts",
+        "README.md",
+        "PUBLISHING.md",
+        "*.node"
+    ]
+}

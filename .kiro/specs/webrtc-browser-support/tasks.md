@@ -68,7 +68,7 @@
     - Test command execution and terminal interface
     - _Requirements: 2.1, 3.1, 5.1_
 
-- [ ] 4. Implement web user interface components
+- [-] 4. Implement web user interface components
   - [ ] 4.1 Create responsive file transfer interface
     - Implement drag-and-drop file transfer UI with progress indicators
     - Add file selection, upload, and download interfaces

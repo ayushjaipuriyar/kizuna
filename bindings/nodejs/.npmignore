@@ -1,0 +1,30 @@
+# Source files
+*.rs
+Cargo.toml
+Cargo.lock
+
+# Build artifacts
+target/
+node_modules/
+
+# Development files
+test/
+examples/
+.git/
+.github/
+*.log
+
+# Documentation source
+jsdoc.json
+docs/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
