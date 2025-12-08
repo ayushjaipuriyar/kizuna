@@ -113,8 +113,11 @@ impl DockerAdapter {
         log::debug!("Configuring container resource limits");
 
         // Set environment variables for resource-constrained operation
-        std::env::set_var("KIZUNA_MINIMAL_MODE", "1");
-        std::env::set_var("KIZUNA_NO_GUI", "1");
+        // SAFETY: Setting environment variables in single-threaded initialization context
+        unsafe {
+            std::env::set_var("KIZUNA_MINIMAL_MODE", "1");
+            std::env::set_var("KIZUNA_NO_GUI", "1");
+        }
 
         Ok(())
     }

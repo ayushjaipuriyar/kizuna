@@ -32,7 +32,10 @@ impl ContainerLogger {
         let log_level = std::env::var("RUST_LOG")
             .unwrap_or_else(|_| self.config.level.clone());
 
-        std::env::set_var("RUST_LOG", log_level);
+        // SAFETY: Setting environment variable during logger initialization
+        unsafe {
+            std::env::set_var("RUST_LOG", log_level);
+        }
 
         Ok(())
     }

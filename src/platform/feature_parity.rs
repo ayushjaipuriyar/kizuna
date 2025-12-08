@@ -175,11 +175,11 @@ impl FeatureParityValidator {
                 inconsistencies.push(FeatureInconsistency {
                     feature: *feature,
                     platforms_with_feature: availability.iter()
-                        .filter(|(_, &v)| v)
+                        .filter(|&(_, &v)| v)
                         .map(|(&k, _)| k)
                         .collect(),
                     platforms_without_feature: availability.iter()
-                        .filter(|(_, &v)| !v)
+                        .filter(|&(_, &v)| !v)
                         .map(|(&k, _)| k)
                         .collect(),
                     severity: InconsistencySeverity::Warning,

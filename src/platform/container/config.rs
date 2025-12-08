@@ -97,8 +97,11 @@ impl ContainerConfig {
     /// Apply configuration to the running system
     pub fn apply(&self) -> PlatformResult<()> {
         // Set environment variables
-        for (key, value) in &self.environment.variables {
-            std::env::set_var(key, value);
+        // SAFETY: Setting environment variables during configuration initialization
+        unsafe {
+            for (key, value) in &self.environment.variables {
+                std::env::set_var(key, value);
+            }
         }
 
         // Configure logging
@@ -303,7 +306,10 @@ impl LoggingConfig {
     /// Apply logging configuration
     pub fn apply(&self) -> PlatformResult<()> {
         // Set log level environment variable
-        std::env::set_var("RUST_LOG", &self.level);
+        // SAFETY: Setting environment variable during logging configuration
+        unsafe {
+            std::env::set_var("RUST_LOG", &self.level);
+        }
 
         Ok(())
     }

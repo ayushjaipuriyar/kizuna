@@ -53,9 +53,10 @@ impl DeploymentConfig {
 }
 
 /// Package format
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum PackageFormat {
     // Linux formats
+    #[default]
     Deb,
     Rpm,
     Flatpak,
@@ -73,6 +74,13 @@ pub enum PackageFormat {
     Exe,
     Zip,
     
+    // Android formats
+    Aab,
+    Apk,
+    
+    // iOS formats
+    Ipa,
+    
     // Container formats
     Docker,
     Oci,
@@ -89,8 +97,8 @@ impl PackageFormat {
             OperatingSystem::Linux => PackageFormat::Deb,
             OperatingSystem::MacOS => PackageFormat::Dmg,
             OperatingSystem::Windows => PackageFormat::Msi,
-            OperatingSystem::Android => PackageFormat::AppBundle,
-            OperatingSystem::iOS => PackageFormat::AppBundle,
+            OperatingSystem::Android => PackageFormat::Aab,
+            OperatingSystem::iOS => PackageFormat::Ipa,
             OperatingSystem::WebBrowser => PackageFormat::Wasm,
             OperatingSystem::Container => PackageFormat::Docker,
             OperatingSystem::Unknown => PackageFormat::Zip,
@@ -112,6 +120,9 @@ impl PackageFormat {
             PackageFormat::Msix => "msix",
             PackageFormat::Exe => "exe",
             PackageFormat::Zip => "zip",
+            PackageFormat::Aab => "aab",
+            PackageFormat::Apk => "apk",
+            PackageFormat::Ipa => "ipa",
             PackageFormat::Docker => "tar",
             PackageFormat::Oci => "tar",
             PackageFormat::Wasm => "wasm",
@@ -477,7 +488,7 @@ impl DeploymentValidationReport {
 }
 
 /// Deployment manifest
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct DeploymentManifest {
     pub version: String,
     pub packages: HashMap<String, PackageInfo>,
