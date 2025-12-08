@@ -4,87 +4,10 @@
 // and build artifact validation for all supported platforms.
 
 use crate::platform::{
-    PlatformResult, PlatformError, PlatformInfo, OperatingSystem, Architecture,
+    PlatformResult, PlatformError, PlatformInfo, OperatingSystem, Architecture, BuildTarget,
 };
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-/// Build target configuration
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct BuildTarget {
-    pub platform: OperatingSystem,
-    pub architecture: Architecture,
-    pub target_triple: String,
-}
-
-impl BuildTarget {
-    /// Create a new build target
-    pub fn new(platform: OperatingSystem, architecture: Architecture) -> Self {
-        let target_triple = Self::generate_target_triple(&platform, &architecture);
-        Self {
-            platform,
-            architecture,
-            target_triple,
-        }
-    }
-    
-    /// Generate Rust target triple from platform and architecture
-    fn generate_target_triple(platform: &OperatingSystem, arch: &Architecture) -> String {
-        match (platform, arch) {
-            (OperatingSystem::Linux, Architecture::X86_64) => "x86_64-unknown-linux-gnu".to_string(),
-            (OperatingSystem::Linux, Architecture::ARM64) => "aarch64-unknown-linux-gnu".to_string(),
-            (OperatingSystem::MacOS, Architecture::X86_64) => "x86_64-apple-darwin".to_string(),
-            (OperatingSystem::MacOS, Architecture::ARM64) => "aarch64-apple-darwin".to_string(),
-            (OperatingSystem::Windows, Architecture::X86_64) => "x86_64-pc-windows-msvc".to_string(),
-            (OperatingSystem::Windows, Architecture::ARM64) => "aarch64-pc-windows-msvc".to_string(),
-            (OperatingSystem::Android, Architecture::ARM64) => "aarch64-linux-android".to_string(),
-            (OperatingSystem::Android, Architecture::ARM32) => "armv7-linux-androideabi".to_string(),
-            (OperatingSystem::iOS, Architecture::ARM64) => "aarch64-apple-ios".to_string(),
-            (OperatingSystem::WebBrowser, Architecture::WASM32) => "wasm32-unknown-unknown".to_string(),
-            _ => "unknown".to_string(),
-        }
-    }
-    
-    /// Get all supported build targets
-    pub fn all_targets() -> Vec<BuildTarget> {
-        vec![
-            // Linux
-            BuildTarget::new(OperatingSystem::Linux, Architecture::X86_64),
-            BuildTarget::new(OperatingSystem::Linux, Architecture::ARM64),
-            // macOS
-            BuildTarget::new(OperatingSystem::MacOS, Architecture::X86_64),
-            BuildTarget::new(OperatingSystem::MacOS, Architecture::ARM64),
-            // Windows
-            BuildTarget::new(OperatingSystem::Windows, Architecture::X86_64),
-            BuildTarget::new(OperatingSystem::Windows, Architecture::ARM64),
-            // WebAssembly
-            BuildTarget::new(OperatingSystem::WebBrowser, Architecture::WASM32),
-        ]
-    }
-    
-    /// Check if this target can be built on the current host
-    pub fn can_build_on_host(&self, host: &PlatformInfo) -> bool {
-        // Native builds are always possible
-        if self.platform == host.os && self.architecture == host.architecture {
-            return true;
-        }
-        
-        // Cross-compilation possibilities
-        match (&host.os, &self.platform) {
-            // Linux can cross-compile to most targets
-            (OperatingSystem::Linux, _) => true,
-            // macOS can build for both Intel and Apple Silicon
-            (OperatingSystem::MacOS, OperatingSystem::MacOS) => true,
-            // macOS can build for iOS
-            (OperatingSystem::MacOS, OperatingSystem::iOS) => true,
-            // Windows can build for different Windows architectures
-            (OperatingSystem::Windows, OperatingSystem::Windows) => true,
-            // Any platform can build WASM
-            (_, OperatingSystem::WebBrowser) => true,
-            _ => false,
-        }
-    }
-}
 
 /// Build configuration
 #[derive(Debug, Clone)]

@@ -44,7 +44,11 @@ pub use adapter::{DefaultPlatformManager, GenericAdapter};
 pub use performance::*;
 pub use resource_monitor::*;
 pub use metrics::*;
-pub use build_system::*;
+// Re-export build_system types except BuildTarget (already in types)
+pub use build_system::{
+    BuildConfig, OptimizationLevel, BuildProfile, BuildArtifact, 
+    ValidationResult, BuildSystemManager, BuildMatrix, ArtifactValidationReport
+};
 pub use deployment::*;
 pub use feature_parity::*;
 

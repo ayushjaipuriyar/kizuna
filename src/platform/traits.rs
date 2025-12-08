@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use crate::platform::{
     PlatformResult, PlatformInfo, PlatformCapabilities, Feature,
     SystemServices, UIFramework, NetworkConfig, SecurityConfig, PlatformConfig,
+    BuildTarget, BuildConfig,
 };
 
 /// Platform manager trait for runtime platform detection and management
@@ -61,21 +62,21 @@ pub trait PlatformAdapter: Send + Sync {
 #[async_trait]
 pub trait BuildSystem: Send + Sync {
     /// Configure build target
-    async fn configure_target(&self, target: crate::platform::BuildTarget) 
-        -> PlatformResult<crate::platform::BuildConfig>;
+    async fn configure_target(&self, target: BuildTarget) 
+        -> PlatformResult<BuildConfig>;
 
     /// Get supported targets
-    fn supported_targets(&self) -> Vec<crate::platform::BuildTarget>;
+    fn supported_targets(&self) -> Vec<BuildTarget>;
 
     /// Validate build configuration
-    fn validate_config(&self, config: &crate::platform::BuildConfig) -> PlatformResult<()>;
+    fn validate_config(&self, config: &BuildConfig) -> PlatformResult<()>;
 }
 
 /// Deployment manager trait for packaging and distribution
 #[async_trait]
 pub trait DeploymentManager: Send + Sync {
     /// Create platform-specific package
-    async fn create_package(&self, config: &crate::platform::BuildConfig) 
+    async fn create_package(&self, config: &BuildConfig) 
         -> PlatformResult<Vec<u8>>;
 
     /// Get package format name
