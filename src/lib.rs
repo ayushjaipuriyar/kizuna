@@ -5,6 +5,7 @@ pub mod clipboard;
 pub mod security;
 pub mod file_transfer;
 pub mod developer_api;
+#[cfg(feature = "streaming")]
 pub mod streaming;
 pub mod cli;
 pub mod command_execution;

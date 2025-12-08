@@ -10,39 +10,38 @@ thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 
-# UUID with conditional features
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-uuid = { version = "1.0", features = ["v4", "serde"] }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies.uuid]
-version = "1.0"
-features = ["v4", "serde", "js"]
-
-# Non-WASM dependencies
+# Optional async runtime dependencies
 tokio = { version = "1", features = ["full"], optional = true }
 futures = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
 async-stream = { version = "0.3", optional = true }
+
+# Optional discovery dependencies
 mdns = { version = "3.0", optional = true }
 btleplug = { version = "0.11", optional = true }
 
+# Optional utility dependencies
 toml = { version = "0.8", optional = true }
 dirs = { version = "5.0", optional = true }
 hostname = { version = "0.3", optional = true }
 tokio-util = { version = "0.7", optional = true }
 socket2 = { version = "0.5", optional = true }
+bytes = { version = "1.0", optional = true }
+url = { version = "2.4", optional = true }
+rand = { version = "0.8", optional = true }
+semver = { version = "1.0", optional = true }
+
+# Optional transport dependencies
 quinn = { version = "0.11", optional = true }
 rustls = { version = "0.23", optional = true }
 rcgen = { version = "0.12", optional = true }
 webrtc = { version = "0.11", optional = true }
 tokio-tungstenite = { version = "0.21", optional = true }
-bytes = { version = "1.0", optional = true }
-url = { version = "2.4", optional = true }
 stun = { version = "0.5", optional = true }
-rand = { version = "0.8", optional = true }
 
-# Security/cryptography dependencies
+# Optional security/cryptography dependencies
 ed25519-dalek = { version = "2.1", features = ["rand_core"], optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
 x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
@@ -53,27 +52,25 @@ keyring = { version = "2.3", optional = true }
 hex = { version = "0.4", optional = true }
 whoami = { version = "1.5", optional = true }
 
-# File transfer dependencies
+# Optional file transfer dependencies
 walkdir = { version = "2.4", optional = true }
 lz4_flex = { version = "0.11", optional = true }
 bincode = { version = "1.3", optional = true }
 
-# Web server dependencies for browser support
+# Optional web server dependencies for browser support
 axum = { version = "0.7", optional = true }
 tower = { version = "0.4", optional = true }
 tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
 hyper = { version = "1.0", optional = true }
 
-# Clipboard dependencies
+# Optional clipboard dependencies
 arboard = { version = "3.3", optional = true }
 image = { version = "0.24", optional = true }
 regex = { version = "1.10", optional = true }
 rusqlite = { version = "0.30", features = ["bundled"], optional = true }
 notify-rust = { version = "4.10", optional = true }
-chrono = { version = "0.4", features = ["serde"] }
-semver = { version = "1.0", optional = true }
 
-# CLI dependencies
+# Optional CLI dependencies
 clap = { version = "4.5", features = ["derive", "cargo", "env", "unicode", "wrap_help"], optional = true }
 clap_complete = { version = "4.5", optional = true }
 ratatui = { version = "0.26", optional = true }
@@ -81,14 +78,26 @@ crossterm = { version = "0.27", optional = true }
 terminal_size = { version = "0.3", optional = true }
 atty = { version = "0.2", optional = true }
 
-# Command execution dependencies
+# Optional command execution dependencies
 sysinfo = { version = "0.30", optional = true }
 
-# Streaming/multimedia dependencies
+# Optional streaming/multimedia dependencies
 gstreamer = { version = "0.22", optional = true }
 gstreamer-video = { version = "0.22", optional = true }
 gstreamer-app = { version = "0.22", optional = true }
 opencv = { version = "0.92", default-features = false, features = ["videoio", "imgproc"], optional = true }
+
+# Optional language binding dependencies
+napi = { version = "2", optional = true, default-features = false, features = ["napi9", "async"] }
+napi-derive = { version = "2", optional = true }
+pyo3 = { version = "0.20", optional = true, features = ["extension-module", "abi3-py38"] }
+pyo3-asyncio = { version = "0.20", optional = true, features = ["tokio-runtime", "attributes"] }
+flutter_rust_bridge = { version = "2", optional = true }
+libloading = { version = "0.8", optional = true }
+
+# UUID with conditional features
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Platform-specific clipboard dependencies
 [target.'cfg(windows)'.dependencies]
@@ -119,6 +128,7 @@ libloading = { version = "0.8", optional = true }
 
 # WASM-specific dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1.0", features = ["v4", "serde", "js"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
@@ -158,12 +168,61 @@ getrandom = { version = "0.2", features = ["js"] }
 tempfile = "3.0"
 
 [features]
-default = ["platform-native"]
+default = ["platform-native", "async-runtime", "core-features", "discovery", "transport", "security", "file-transfer", "browser-support", "clipboard", "cli", "command-execution"]
+
+# Core features that most applications need
+core-features = [
+    "dep:tokio",
+    "dep:futures",
+    "dep:futures-util",
+    "dep:async-stream",
+    "dep:toml",
+    "dep:dirs",
+    "dep:hostname",
+    "dep:tokio-util",
+    "dep:bytes",
+    "dep:url",
+    "dep:rand",
+    "dep:semver",
+]
+
+# Async runtime support
+async-runtime = ["dep:tokio", "dep:futures", "dep:futures-util", "dep:async-stream"]
 
 # Language bindings
-nodejs = ["napi", "napi-derive"]
-python = ["pyo3", "pyo3-asyncio"]
-flutter = ["flutter_rust_bridge"]
+nodejs = ["dep:napi", "dep:napi-derive", "async-runtime"]
+python = ["dep:pyo3", "dep:pyo3-asyncio", "async-runtime"]
+flutter = ["dep:flutter_rust_bridge", "async-runtime"]
+
+# Plugin system
+plugins = ["dep:libloading", "async-runtime"]
+
+# Discovery features
+discovery = ["dep:mdns", "dep:btleplug", "async-runtime"]
+
+# Transport features
+transport = ["dep:quinn", "dep:rustls", "dep:rcgen", "dep:webrtc", "dep:tokio-tungstenite", "dep:socket2", "dep:stun", "async-runtime"]
+
+# Security features
+security = ["dep:ed25519-dalek", "dep:chacha20poly1305", "dep:x25519-dalek", "dep:sha2", "dep:hmac", "dep:zeroize", "dep:keyring", "dep:hex", "dep:whoami"]
+
+# File transfer features
+file-transfer = ["dep:walkdir", "dep:lz4_flex", "dep:bincode", "async-runtime"]
+
+# Browser support features
+browser-support = ["dep:axum", "dep:tower", "dep:tower-http", "dep:hyper", "dep:tokio-tungstenite", "dep:webrtc", "async-runtime"]
+
+# Clipboard features
+clipboard = ["dep:arboard", "dep:image", "dep:regex", "dep:rusqlite", "dep:notify-rust"]
+
+# CLI features
+cli = ["dep:clap", "dep:clap_complete", "dep:ratatui", "dep:crossterm", "dep:terminal_size", "dep:atty"]
+
+# Command execution features
+command-execution = ["dep:sysinfo", "async-runtime"]
+
+# Streaming features
+streaming = ["dep:gstreamer", "dep:gstreamer-video", "dep:gstreamer-app", "dep:opencv", "async-runtime"]
 
 # Platform features
 platform-native = []
@@ -180,4 +239,16 @@ hardware-acceleration = []
 full-features = [
     "platform-native",
     "hardware-acceleration",
+    "async-runtime",
+    "core-features",
+    "discovery",
+    "transport",
+    "security",
+    "file-transfer",
+    "browser-support",
+    "clipboard",
+    "cli",
+    "command-execution",
+    "streaming",
+    "plugins",
 ]
