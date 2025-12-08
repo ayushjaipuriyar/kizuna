@@ -7,8 +7,11 @@
 
 use crate::cli::error::{CLIError, CLIResult};
 use crate::cli::handlers::{
-    DiscoverHandler, TransferHandler, StreamingHandler, ExecHandler, PeersHandler, StatusHandler,
+    DiscoverHandler, TransferHandler,
 };
+
+#[cfg(feature = "streaming")]
+use crate::cli::handlers::{StreamingHandler, ExecHandler, PeersHandler, StatusHandler};
 use crate::cli::security_integration::CLISecurityIntegration;
 use crate::security::api::SecuritySystem;
 use std::path::PathBuf;
@@ -25,12 +28,16 @@ pub struct CLISystemIntegration {
     /// Transfer handler with security integration
     pub transfer_handler: Arc<TransferHandler>,
     /// Streaming handler with security integration
+    #[cfg(feature = "streaming")]
     pub streaming_handler: Arc<StreamingHandler>,
     /// Command execution handler with security integration
+    #[cfg(feature = "streaming")]
     pub exec_handler: Arc<RwLock<ExecHandler>>,
     /// Peers handler with discovery integration
+    #[cfg(feature = "streaming")]
     pub peers_handler: Arc<RwLock<PeersHandler>>,
     /// Status handler with system integration
+    #[cfg(feature = "streaming")]
     pub status_handler: Arc<RwLock<StatusHandler>>,
     /// Security integration
     pub security: Arc<CLISecurityIntegration>,
@@ -64,33 +71,49 @@ impl CLISystemIntegration {
             session_dir,
         ));
 
-        // Create streaming handler with security
-        let mut streaming_handler = StreamingHandler::new();
-        streaming_handler.set_security(Arc::clone(&security_system));
-        let streaming_handler = Arc::new(streaming_handler);
+        // Create streaming handler with security (if feature enabled)
+        #[cfg(feature = "streaming")]
+        let streaming_handler = {
+            let mut handler = StreamingHandler::new();
+            handler.set_security(Arc::clone(&security_system));
+            Arc::new(handler)
+        };
 
-        // Create exec handler with security
-        let mut exec_handler = ExecHandler::new();
-        exec_handler.set_security(Arc::clone(&security_system));
-        let exec_handler = Arc::new(RwLock::new(exec_handler));
+        // Create exec handler with security (if feature enabled)
+        #[cfg(feature = "streaming")]
+        let exec_handler = {
+            let mut handler = ExecHandler::new();
+            handler.set_security(Arc::clone(&security_system));
+            Arc::new(RwLock::new(handler))
+        };
 
-        // Create peers handler with discovery integration
-        let peers_handler = PeersHandler::with_discovery(Arc::clone(&discover_handler));
-        let peers_handler = Arc::new(RwLock::new(peers_handler));
+        // Create peers handler with discovery integration (if feature enabled)
+        #[cfg(feature = "streaming")]
+        let peers_handler = {
+            let handler = PeersHandler::with_discovery(Arc::clone(&discover_handler));
+            Arc::new(RwLock::new(handler))
+        };
 
-        // Create status handler with system integration
-        let mut status_handler = StatusHandler::new();
-        status_handler.set_discovery(Arc::clone(&discover_handler));
-        status_handler.set_transfer(Arc::clone(&transfer_handler));
-        status_handler.set_streaming(Arc::clone(&streaming_handler));
-        let status_handler = Arc::new(RwLock::new(status_handler));
+        // Create status handler with system integration (if feature enabled)
+        #[cfg(feature = "streaming")]
+        let status_handler = {
+            let mut handler = StatusHandler::new();
+            handler.set_discovery(Arc::clone(&discover_handler));
+            handler.set_transfer(Arc::clone(&transfer_handler));
+            handler.set_streaming(Arc::clone(&streaming_handler));
+            Arc::new(RwLock::new(handler))
+        };
 
         Ok(Self {
             discover_handler,
             transfer_handler,
+            #[cfg(feature = "streaming")]
             streaming_handler,
+            #[cfg(feature = "streaming")]
             exec_handler,
+            #[cfg(feature = "streaming")]
             peers_handler,
+            #[cfg(feature = "streaming")]
             status_handler,
             security,
         })
@@ -160,6 +183,7 @@ impl CLISystemIntegration {
     }
 
     /// Get system status with all integrated information
+    #[cfg(feature = "streaming")]
     pub async fn get_system_status(&self) -> CLIResult<crate::cli::handlers::SystemStatus> {
         let handler = self.status_handler.read().await;
         handler.get_system_status().await

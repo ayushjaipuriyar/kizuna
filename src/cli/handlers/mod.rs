@@ -3,6 +3,7 @@
 mod batch;
 mod clipboard;
 mod discover;
+#[cfg(feature = "streaming")]
 mod streaming;
 mod transfer;
 
@@ -12,6 +13,7 @@ pub use batch::{
 };
 pub use clipboard::{ClipboardAction, ClipboardArgs, ClipboardHandler, ClipboardResult};
 pub use discover::DiscoverHandler;
+#[cfg(feature = "streaming")]
 pub use streaming::{
     ExecHandler, NetworkDiagnostics, PeersHandler, StatusHandler, StreamingHandler, SystemStatus,
 };
