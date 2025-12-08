@@ -391,14 +391,12 @@ impl HistoryManager for SqliteHistoryManager {
         ).map_err(|e| CommandError::Internal(format!("Failed to prepare statement: {}", e)))?;
 
         let entries = stmt.query_map(params![limit_value], |row| {
-            Ok(row)
-        }).map_err(|e| CommandError::Internal(format!("Failed to query history: {}", e)))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CommandError::Internal(format!("Failed to collect rows: {}", e)))?;
+            self.deserialize_entry(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        }).map_err(|e| CommandError::Internal(format!("Failed to query history: {}", e)))?;
 
         let mut result = Vec::new();
-        for row in entries {
-            result.push(self.deserialize_entry(&row)?);
+        for entry in entries {
+            result.push(entry.map_err(|e| CommandError::Internal(format!("Failed to deserialize entry: {}", e)))?);
         }
 
         Ok(result)
@@ -416,14 +414,12 @@ impl HistoryManager for SqliteHistoryManager {
         ).map_err(|e| CommandError::Internal(format!("Failed to prepare statement: {}", e)))?;
 
         let entries = stmt.query_map(params![search_pattern, search_pattern, search_pattern], |row| {
-            Ok(row)
-        }).map_err(|e| CommandError::Internal(format!("Failed to query history: {}", e)))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CommandError::Internal(format!("Failed to collect rows: {}", e)))?;
+            self.deserialize_entry(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        }).map_err(|e| CommandError::Internal(format!("Failed to query history: {}", e)))?;
 
         let mut result = Vec::new();
-        for row in entries {
-            result.push(self.deserialize_entry(&row)?);
+        for entry in entries {
+            result.push(entry.map_err(|e| CommandError::Internal(format!("Failed to deserialize entry: {}", e)))?);
         }
 
         Ok(result)
@@ -477,14 +473,12 @@ impl HistoryManager for SqliteHistoryManager {
         let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
         
         let entries = stmt.query_map(params_refs.as_slice(), |row| {
-            Ok(row)
-        }).map_err(|e| CommandError::Internal(format!("Failed to query history: {}", e)))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CommandError::Internal(format!("Failed to collect rows: {}", e)))?;
+            self.deserialize_entry(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        }).map_err(|e| CommandError::Internal(format!("Failed to query history: {}", e)))?;
 
         let mut result = Vec::new();
-        for row in entries {
-            result.push(self.deserialize_entry(&row)?);
+        for entry in entries {
+            result.push(entry.map_err(|e| CommandError::Internal(format!("Failed to deserialize entry: {}", e)))?);
         }
 
         Ok(result)
@@ -499,14 +493,11 @@ impl HistoryManager for SqliteHistoryManager {
         ).map_err(|e| CommandError::Internal(format!("Failed to prepare statement: {}", e)))?;
 
         let entry = stmt.query_row(params![entry_id.to_string()], |row| {
-            Ok(row)
+            self.deserialize_entry(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
         }).optional()
         .map_err(|e| CommandError::Internal(format!("Failed to query entry: {}", e)))?;
 
-        match entry {
-            Some(row) => Ok(Some(self.deserialize_entry(&row)?)),
-            None => Ok(None),
-        }
+        Ok(entry)
     }
 
     async fn cleanup_old_entries(&self, retention_days: u32) -> CmdResult<usize> {

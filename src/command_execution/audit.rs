@@ -360,14 +360,12 @@ impl AuditLogger for SqliteAuditLogger {
         let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
         
         let entries = stmt.query_map(params_refs.as_slice(), |row| {
-            Ok(row)
-        }).map_err(|e| CommandError::Internal(format!("Failed to query audit log: {}", e)))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CommandError::Internal(format!("Failed to collect rows: {}", e)))?;
+            self.deserialize_entry(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        }).map_err(|e| CommandError::Internal(format!("Failed to query audit log: {}", e)))?;
 
         let mut result = Vec::new();
-        for row in entries {
-            result.push(self.deserialize_entry(&row)?);
+        for entry in entries {
+            result.push(entry.map_err(|e| CommandError::Internal(format!("Failed to deserialize entry: {}", e)))?);
         }
 
         Ok(result)
@@ -412,14 +410,12 @@ impl AuditLogger for SqliteAuditLogger {
         ).map_err(|e| CommandError::Internal(format!("Failed to prepare statement: {}", e)))?;
 
         let entries = stmt.query_map([], |row| {
-            Ok(row)
-        }).map_err(|e| CommandError::Internal(format!("Failed to query security events: {}", e)))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CommandError::Internal(format!("Failed to collect rows: {}", e)))?;
+            self.deserialize_entry(row).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+        }).map_err(|e| CommandError::Internal(format!("Failed to query security events: {}", e)))?;
 
         let mut result = Vec::new();
-        for row in entries {
-            result.push(self.deserialize_entry(&row)?);
+        for entry in entries {
+            result.push(entry.map_err(|e| CommandError::Internal(format!("Failed to deserialize entry: {}", e)))?);
         }
 
         Ok(result)
