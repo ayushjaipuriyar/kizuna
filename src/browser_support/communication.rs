@@ -35,8 +35,9 @@ pub trait CommunicationInterface {
 pub struct UnifiedCommunicationManager {
     webrtc_manager: Arc<tokio::sync::RwLock<WebRTCManager>>,
     websocket_manager: Arc<tokio::sync::RwLock<WebSocketFallbackManager>>,
-    active_connections: HashMap<Uuid, UnifiedConnection>,
+    active_connections: Arc<tokio::sync::RwLock<HashMap<Uuid, UnifiedConnection>>>,
     protocol_detector: ProtocolDetector,
+    fallback_enabled: bool,
 }
 
 impl UnifiedCommunicationManager {
@@ -45,8 +46,20 @@ impl UnifiedCommunicationManager {
         Self {
             webrtc_manager: Arc::new(tokio::sync::RwLock::new(WebRTCManager::new())),
             websocket_manager: Arc::new(tokio::sync::RwLock::new(WebSocketFallbackManager::new())),
-            active_connections: HashMap::new(),
+            active_connections: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             protocol_detector: ProtocolDetector::new(),
+            fallback_enabled: true,
+        }
+    }
+    
+    /// Create a new unified communication manager with fallback configuration
+    pub fn with_fallback(fallback_enabled: bool) -> Self {
+        Self {
+            webrtc_manager: Arc::new(tokio::sync::RwLock::new(WebRTCManager::new())),
+            websocket_manager: Arc::new(tokio::sync::RwLock::new(WebSocketFallbackManager::new())),
+            active_connections: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            protocol_detector: ProtocolDetector::new(),
+            fallback_enabled,
         }
     }
     
@@ -64,7 +77,15 @@ impl UnifiedCommunicationManager {
         
         match protocol {
             CommunicationProtocol::WebRTC => {
-                self.establish_webrtc_connection(connection_info).await
+                // Try WebRTC first, fallback to WebSocket if it fails
+                match self.establish_webrtc_connection(connection_info.clone()).await {
+                    Ok(session) => Ok(session),
+                    Err(e) if self.fallback_enabled && self.protocol_detector.should_fallback_to_websocket(Uuid::nil(), &e).await => {
+                        println!("WebRTC connection failed, falling back to WebSocket: {}", e);
+                        self.establish_websocket_connection(connection_info).await
+                    }
+                    Err(e) => Err(e),
+                }
             }
             CommunicationProtocol::WebSocket => {
                 self.establish_websocket_connection(connection_info).await
@@ -86,7 +107,7 @@ impl UnifiedCommunicationManager {
             last_activity: std::time::SystemTime::now(),
         };
         
-        self.active_connections.insert(session.session_id, unified_connection);
+        self.active_connections.write().await.insert(session.session_id, unified_connection);
         Ok(session)
     }
     
@@ -104,16 +125,27 @@ impl UnifiedCommunicationManager {
             last_activity: std::time::SystemTime::now(),
         };
         
-        self.active_connections.insert(session.session_id, unified_connection);
+        self.active_connections.write().await.insert(session.session_id, unified_connection);
         Ok(session)
     }
     
     /// Attempt fallback from WebRTC to WebSocket
     pub async fn fallback_to_websocket(&mut self, session_id: Uuid, connection_info: BrowserConnectionInfo) -> BrowserResult<()> {
+        if !self.fallback_enabled {
+            return Err(BrowserSupportError::ConfigurationError {
+                parameter: "fallback".to_string(),
+                issue: "Fallback is disabled".to_string(),
+            });
+        }
+        
         // Close existing WebRTC connection if it exists
-        if let Some(connection) = self.active_connections.get(&session_id) {
-            if matches!(connection.protocol, CommunicationProtocol::WebRTC) {
-                self.webrtc_manager.write().await.close_connection(session_id).await?;
+        {
+            let connections = self.active_connections.read().await;
+            if let Some(connection) = connections.get(&session_id) {
+                if matches!(connection.protocol, CommunicationProtocol::WebRTC) {
+                    drop(connections);
+                    self.webrtc_manager.write().await.close_connection(session_id).await?;
+                }
             }
         }
         
@@ -130,7 +162,7 @@ impl UnifiedCommunicationManager {
             last_activity: std::time::SystemTime::now(),
         };
         
-        self.active_connections.insert(session_id, unified_connection);
+        self.active_connections.write().await.insert(session_id, unified_connection);
         
         // Notify browser about fallback activation
         let fallback_message = BrowserMessage {
@@ -148,6 +180,32 @@ impl UnifiedCommunicationManager {
         Ok(())
     }
     
+    /// Monitor connection health and trigger fallback if needed
+    pub async fn monitor_connection_health(&mut self, session_id: Uuid, connection_info: BrowserConnectionInfo) -> BrowserResult<()> {
+        let should_fallback = {
+            let connections = self.active_connections.read().await;
+            if let Some(connection) = connections.get(&session_id) {
+                // Check if using WebRTC and connection is failing
+                if matches!(connection.protocol, CommunicationProtocol::WebRTC) {
+                    // Check connection state
+                    let is_connected = self.webrtc_manager.read().await.is_connected(session_id).await?;
+                    !is_connected
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
+        
+        if should_fallback && self.fallback_enabled {
+            println!("Connection health check failed for session {}, triggering fallback", session_id);
+            self.fallback_to_websocket(session_id, connection_info).await?;
+        }
+        
+        Ok(())
+    }
+    
     /// Extract protocol capabilities from browser info
     fn extract_capabilities(&self, browser_info: &BrowserInfo) -> ProtocolCapabilities {
         ProtocolCapabilities {
@@ -161,14 +219,30 @@ impl UnifiedCommunicationManager {
     }
     
     /// Get the protocol for a session
-    pub fn get_session_protocol(&self, session_id: Uuid) -> Option<CommunicationProtocol> {
-        self.active_connections.get(&session_id).map(|conn| conn.protocol.clone())
+    pub async fn get_session_protocol(&self, session_id: Uuid) -> Option<CommunicationProtocol> {
+        let connections = self.active_connections.read().await;
+        connections.get(&session_id).map(|conn| conn.protocol.clone())
+    }
+    
+    /// Check if fallback is enabled
+    pub fn is_fallback_enabled(&self) -> bool {
+        self.fallback_enabled
+    }
+    
+    /// Enable or disable automatic fallback
+    pub fn set_fallback_enabled(&mut self, enabled: bool) {
+        self.fallback_enabled = enabled;
     }
     
     /// Shutdown the communication manager
     pub async fn shutdown(&mut self) -> BrowserResult<()> {
         // Close all active connections
-        for (session_id, connection) in self.active_connections.drain() {
+        let connections: Vec<_> = {
+            let mut connections = self.active_connections.write().await;
+            connections.drain().collect()
+        };
+        
+        for (session_id, connection) in connections {
             match connection.protocol {
                 CommunicationProtocol::WebRTC => {
                     let _ = self.webrtc_manager.write().await.close_connection(session_id).await;
@@ -188,8 +262,12 @@ impl UnifiedCommunicationManager {
 #[async_trait]
 impl CommunicationInterface for UnifiedCommunicationManager {
     async fn send_message(&self, session_id: Uuid, message: BrowserMessage) -> BrowserResult<()> {
-        if let Some(connection) = self.active_connections.get(&session_id) {
-            match connection.protocol {
+        let connections = self.active_connections.read().await;
+        if let Some(connection) = connections.get(&session_id) {
+            let protocol = connection.protocol.clone();
+            drop(connections);
+            
+            match protocol {
                 CommunicationProtocol::WebRTC => {
                     // Route to WebRTC data channel
                     self.webrtc_manager.write().await.send_message(session_id, message).await
@@ -208,8 +286,12 @@ impl CommunicationInterface for UnifiedCommunicationManager {
     }
     
     async fn receive_message(&self, session_id: Uuid) -> BrowserResult<Option<BrowserMessage>> {
-        if let Some(connection) = self.active_connections.get(&session_id) {
-            match connection.protocol {
+        let connections = self.active_connections.read().await;
+        if let Some(connection) = connections.get(&session_id) {
+            let protocol = connection.protocol.clone();
+            drop(connections);
+            
+            match protocol {
                 CommunicationProtocol::WebRTC => {
                     self.webrtc_manager.read().await.receive_message(session_id).await
                 }
@@ -226,8 +308,12 @@ impl CommunicationInterface for UnifiedCommunicationManager {
     }
     
     async fn is_connected(&self, session_id: Uuid) -> BrowserResult<bool> {
-        if let Some(connection) = self.active_connections.get(&session_id) {
-            match connection.protocol {
+        let connections = self.active_connections.read().await;
+        if let Some(connection) = connections.get(&session_id) {
+            let protocol = connection.protocol.clone();
+            drop(connections);
+            
+            match protocol {
                 CommunicationProtocol::WebRTC => {
                     self.webrtc_manager.read().await.is_connected(session_id).await
                 }
@@ -241,8 +327,12 @@ impl CommunicationInterface for UnifiedCommunicationManager {
     }
     
     async fn close_connection(&self, session_id: Uuid) -> BrowserResult<()> {
-        if let Some(connection) = self.active_connections.get(&session_id) {
-            match connection.protocol {
+        let connections = self.active_connections.read().await;
+        if let Some(connection) = connections.get(&session_id) {
+            let protocol = connection.protocol.clone();
+            drop(connections);
+            
+            match protocol {
                 CommunicationProtocol::WebRTC => {
                     self.webrtc_manager.write().await.close_connection(session_id).await
                 }
@@ -256,8 +346,12 @@ impl CommunicationInterface for UnifiedCommunicationManager {
     }
     
     async fn get_connection_stats(&self, session_id: Uuid) -> BrowserResult<ConnectionStats> {
-        if let Some(connection) = self.active_connections.get(&session_id) {
-            match connection.protocol {
+        let connections = self.active_connections.read().await;
+        if let Some(connection) = connections.get(&session_id) {
+            let protocol = connection.protocol.clone();
+            drop(connections);
+            
+            match protocol {
                 CommunicationProtocol::WebRTC => {
                     self.webrtc_manager.read().await.get_connection_stats(session_id).await
                 }

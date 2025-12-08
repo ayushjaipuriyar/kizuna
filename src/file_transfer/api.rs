@@ -9,6 +9,8 @@ use crate::file_transfer::{
     security_integration::{FileTransferSecurity, SecureTransferSession, SecureTransfer},
     transport_integration::FileTransferTransport,
     progress::{ProgressTracker, ProgressCallback, EventCallback, TransferEvent},
+    notification::{NotificationManager, NotificationCallback, TransferStatus, FileStatus, FileTransferState},
+    incoming::{IncomingTransferManager, IncomingTransferRequest, TransferRequestDetails},
     session::SessionManager,
     transport::TransportNegotiatorImpl,
     TransportNegotiator,
@@ -31,6 +33,10 @@ pub struct FileTransferSystem {
     transport_negotiator: Arc<TransportNegotiatorImpl>,
     /// Progress tracker
     progress_tracker: Arc<ProgressTracker>,
+    /// Notification manager
+    notification_manager: Arc<NotificationManager>,
+    /// Incoming transfer manager
+    incoming_manager: Arc<IncomingTransferManager>,
     /// Global bandwidth limit
     bandwidth_limit: Arc<tokio::sync::RwLock<Option<u64>>>,
 }
@@ -46,6 +52,8 @@ impl FileTransferSystem {
         let session_manager = Arc::new(SessionManager::new(session_persistence_dir));
         let transport_negotiator = Arc::new(TransportNegotiatorImpl::new());
         let progress_tracker = Arc::new(ProgressTracker::new());
+        let notification_manager = Arc::new(NotificationManager::new());
+        let incoming_manager = Arc::new(IncomingTransferManager::new());
 
         Self {
             security,
@@ -53,6 +61,8 @@ impl FileTransferSystem {
             session_manager,
             transport_negotiator,
             progress_tracker,
+            notification_manager,
+            incoming_manager,
             bandwidth_limit: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
@@ -65,6 +75,18 @@ impl FileTransferSystem {
     /// Initialize the file transfer system
     pub async fn initialize(&self) -> Result<()> {
         self.session_manager.initialize().await?;
+        
+        // Connect progress tracker events to notification manager
+        let notification_manager = Arc::clone(&self.notification_manager);
+        self.progress_tracker
+            .register_event_callback(Arc::new(move |event| {
+                let notification_manager = Arc::clone(&notification_manager);
+                tokio::spawn(async move {
+                    notification_manager.notify_from_event(event).await;
+                });
+            }))
+            .await;
+        
         Ok(())
     }
 
@@ -76,6 +98,49 @@ impl FileTransferSystem {
     /// Register an event callback
     pub async fn on_event(&self, callback: EventCallback) {
         self.progress_tracker.register_event_callback(callback).await;
+    }
+
+    /// Register a notification callback
+    pub async fn on_notification(&self, callback: NotificationCallback) {
+        self.notification_manager.register_callback(callback).await;
+    }
+
+    /// Get comprehensive transfer status for UI display
+    pub async fn get_transfer_status(&self, session_id: SessionId) -> Result<TransferStatus> {
+        let session = self.session_manager.get_session(session_id).await?;
+        let progress = self.progress_tracker.get_progress(session_id).await?;
+
+        // Build file status list from manifest
+        let files: Vec<FileStatus> = session
+            .manifest
+            .files
+            .iter()
+            .map(|file_entry| FileStatus {
+                path: file_entry.path.clone(),
+                size: file_entry.size,
+                bytes_transferred: 0, // TODO: Track per-file progress
+                state: if progress.files_completed > 0 {
+                    FileTransferState::Completed
+                } else {
+                    FileTransferState::Pending
+                },
+                checksum_verified: false,
+            })
+            .collect();
+
+        Ok(TransferStatus {
+            session_id,
+            peer_id: session.peer_id,
+            state: session.state,
+            progress,
+            transport: session.transport,
+            bandwidth_limit: session.bandwidth_limit,
+            parallel_streams: session.parallel_streams,
+            files,
+            started_at: session.created_at,
+            completed_at: None, // TODO: Track completion time
+            error_message: None,
+        })
     }
 
     /// Send a file to a peer
@@ -181,6 +246,86 @@ impl FileTransferSystem {
         self.session_manager
             .update_session_state(session_id, TransferState::Transferring)
             .await
+    }
+
+    // Incoming transfer management methods
+
+    /// Handle an incoming transfer request
+    pub async fn receive_transfer_request(
+        &self,
+        sender_id: PeerId,
+        manifest: TransferManifest,
+    ) -> Result<IncomingTransferRequest> {
+        // Verify peer trust
+        self.security.verify_peer_trust(&sender_id).await?;
+
+        // Register the incoming request
+        let request = self.incoming_manager
+            .receive_request(sender_id, manifest)
+            .await?;
+
+        // Notify about incoming request
+        self.notification_manager
+            .notify(crate::file_transfer::notification::TransferNotification::TransferStarted {
+                session_id: request.request_id,
+                peer_id: request.sender_id.clone(),
+                file_count: request.manifest.file_count,
+                total_size: request.manifest.total_size,
+            })
+            .await;
+
+        Ok(request)
+    }
+
+    /// Get all pending incoming transfer requests
+    pub async fn get_pending_incoming_requests(&self) -> Result<Vec<IncomingTransferRequest>> {
+        self.incoming_manager.get_pending_requests().await
+    }
+
+    /// Get details for a specific incoming transfer request
+    pub async fn get_incoming_request_details(
+        &self,
+        request_id: TransferId,
+    ) -> Result<TransferRequestDetails> {
+        self.incoming_manager.get_request_details(request_id).await
+    }
+
+    /// Accept an incoming transfer request
+    pub async fn accept_incoming_transfer(
+        &self,
+        request_id: TransferId,
+        download_location: PathBuf,
+    ) -> Result<TransferSession> {
+        // Accept the request
+        let manifest = self.incoming_manager
+            .accept_request(request_id, download_location)
+            .await?;
+
+        // Start the transfer session
+        let session = self.start_transfer(manifest, "incoming".to_string()).await?;
+
+        Ok(session)
+    }
+
+    /// Reject an incoming transfer request
+    pub async fn reject_incoming_transfer(
+        &self,
+        request_id: TransferId,
+        reason: Option<String>,
+    ) -> Result<()> {
+        self.incoming_manager
+            .reject_request(request_id, reason)
+            .await
+    }
+
+    /// Defer an incoming transfer request (keep it pending)
+    pub async fn defer_incoming_transfer(&self, request_id: TransferId) -> Result<()> {
+        self.incoming_manager.defer_request(request_id).await
+    }
+
+    /// Cleanup expired incoming transfer requests
+    pub async fn cleanup_expired_incoming_requests(&self) -> Result<usize> {
+        self.incoming_manager.cleanup_expired_requests().await
     }
 }
 

@@ -23,6 +23,44 @@ pub struct KizunaConfig {
     
     /// Number of runtime worker threads (None = default based on CPU cores)
     pub runtime_threads: Option<usize>,
+    
+    // === System Integration Configuration ===
+    
+    /// Enable discovery system
+    pub enable_discovery: bool,
+    
+    /// Enable transport system
+    pub enable_transport: bool,
+    
+    /// Enable security system (always recommended)
+    pub enable_security: bool,
+    
+    /// Enable file transfer system
+    pub enable_file_transfer: bool,
+    
+    /// Enable streaming system
+    pub enable_streaming: bool,
+    
+    /// Enable clipboard system
+    pub enable_clipboard: bool,
+    
+    /// Enable command execution system
+    pub enable_command_execution: bool,
+    
+    /// Discovery strategies to enable
+    pub discovery_strategies: Vec<String>,
+    
+    /// Transport protocols to enable
+    pub transport_protocols: Vec<String>,
+    
+    /// Connection timeout in seconds
+    pub connection_timeout_secs: u64,
+    
+    /// Security session timeout in seconds
+    pub security_session_timeout_secs: u64,
+    
+    /// File transfer session directory
+    pub file_transfer_session_dir: PathBuf,
 }
 
 impl Default for KizunaConfig {
@@ -34,6 +72,32 @@ impl Default for KizunaConfig {
             networking: NetworkConfig::default(),
             plugins: Vec::new(),
             runtime_threads: None,
+            enable_discovery: true,
+            enable_transport: true,
+            enable_security: true,
+            enable_file_transfer: true,
+            enable_streaming: true,
+            enable_clipboard: true,
+            enable_command_execution: true,
+            discovery_strategies: vec![
+                "mdns".to_string(),
+                "udp".to_string(),
+                "tcp".to_string(),
+            ],
+            transport_protocols: vec![
+                "tcp".to_string(),
+                "quic".to_string(),
+                "webrtc".to_string(),
+                "websocket".to_string(),
+            ],
+            connection_timeout_secs: 30,
+            security_session_timeout_secs: 3600,
+            file_transfer_session_dir: {
+                let mut path = std::env::temp_dir();
+                path.push("kizuna");
+                path.push("file_transfer");
+                path
+            },
         }
     }
 }

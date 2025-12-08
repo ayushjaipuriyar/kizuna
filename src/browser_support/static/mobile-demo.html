@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2196F3">
+    <title>Kizuna Mobile - Browser Support</title>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="kizuna-ui.css">
+    <link rel="stylesheet" href="kizuna-responsive.css">
+    <link rel="stylesheet" href="kizuna-mobile.css">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .mobile-app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f5f5;
+        }
+
+        .mobile-tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .mobile-tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 500;
+            color: #757575;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+
+        .mobile-tab.active {
+            color: #2196F3;
+            border-bottom-color: #2196F3;
+        }
+
+        .mobile-tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .mobile-tab-content.active {
+            display: block;
+        }
+
+        .feature-list {
+            padding: 16px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .feature-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .feature-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .feature-status.supported {
+            background: #E8F5E9;
+            color: #4CAF50;
+        }
+
+        .feature-status.unsupported {
+            background: #FFEBEE;
+            color: #F44336;
+        }
+
+        .feature-description {
+            font-size: 14px;
+            color: #757575;
+            margin-bottom: 8px;
+        }
+
+        .feature-fallback {
+            font-size: 13px;
+            color: #FF9800;
+            padding: 8px;
+            background: #FFF3E0;
+            border-radius: 4px;
+        }
+
+        .device-info {
+            padding: 16px;
+        }
+
+        .info-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #2196F3;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #757575;
+            font-size: 14px;
+        }
+
+        .info-value {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .limitation-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #FF9800;
+        }
+
+        .limitation-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+
+        .limitation-impact {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .limitation-impact.high {
+            background: #FFEBEE;
+            color: #F44336;
+        }
+
+        .limitation-impact.medium {
+            background: #FFF3E0;
+            color: #FF9800;
+        }
+
+        .limitation-impact.low {
+            background: #E3F2FD;
+            color: #2196F3;
+        }
+
+        .limitation-message {
+            font-size: 14px;
+            color: #424242;
+            margin-bottom: 8px;
+        }
+
+        .limitation-fallback {
+            font-size: 13px;
+            color: #757575;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="mobile-app">
+        <div class="mobile-tabs">
+            <button class="mobile-tab active" data-tab="features">Features</button>
+            <button class="mobile-tab" data-tab="device">Device</button>
+            <button class="mobile-tab" data-tab="limitations">Limitations</button>
+            <button class="mobile-tab" data-tab="demo">Demo</button>
+        </div>
+
+        <div class="mobile-tab-content active" id="features-tab">
+            <div class="feature-list" id="feature-list">
+                <!-- Features will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="mobile-tab-content" id="device-tab">
+            <div class="device-info" id="device-info">
+                <!-- Device info will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="mobile-tab-content" id="limitations-tab">
+            <div class="feature-list" id="limitations-list">
+                <!-- Limitations will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="mobile-tab-content" id="demo-tab">
+            <div id="demo-container">
+                <!-- Demo UI will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="kizuna-feature-detection.js"></script>
+    <script src="kizuna-mobile.js"></script>
+    <script>
+        // Initialize feature detection
+        const detector = KizunaFeatureDetection.detector;
+        const fallbackManager = KizunaFeatureDetection.fallbackManager;
+
+        // Tab switching
+        document.querySelectorAll('.mobile-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+
+                // Update active tab
+                document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update active content
+                document.querySelectorAll('.mobile-tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(`${tabName}-tab`).classList.add('active');
+            });
+        });
+
+        // Populate features
+        function populateFeatures() {
+            const featureList = document.getElementById('feature-list');
+            const features = detector.features;
+
+            const featureDescriptions = {
+                webrtc: 'Real-time peer-to-peer communication',
+                websocket: 'Bidirectional communication protocol',
+                serviceWorker: 'Background scripts for offline functionality',
+                clipboard: 'Access to system clipboard',
+                fileAPI: 'File reading and manipulation',
+                dragAndDrop: 'Drag and drop file uploads',
+                fullscreen: 'Fullscreen video playback',
+                notifications: 'Push notifications',
+                localStorage: 'Persistent local storage',
+                mediaDevices: 'Camera and microphone access'
+            };
+
+            let html = '';
+            for (const [feature, supported] of Object.entries(features)) {
+                if (featureDescriptions[feature]) {
+                    const fallback = fallbackManager.getFallback(feature);
+                    html += `
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <span class="feature-name">${feature}</span>
+                                <span class="feature-status ${supported ? 'supported' : 'unsupported'}">
+                                    ${supported ? 'Supported' : 'Not Supported'}
+                                </span>
+                            </div>
+                            <div class="feature-description">${featureDescriptions[feature]}</div>
+                            ${!supported && fallback ? `
+                                <div class="feature-fallback">
+                                    Fallback: ${fallback.primary}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+            }
+            featureList.innerHTML = html;
+        }
+
+        // Populate device info
+        function populateDeviceInfo() {
+            const deviceInfo = document.getElementById('device-info');
+            const device = detector.deviceInfo;
+            const browser = detector.browserInfo;
+
+            deviceInfo.innerHTML = `
+                <div class="info-card">
+                    <div class="info-title">Device Information</div>
+                    <div class="info-item">
+                        <span class="info-label">Type</span>
+                        <span class="info-value">${device.isMobile ? 'Mobile' : device.isTablet ? 'Tablet' : 'Desktop'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Platform</span>
+                        <span class="info-value">${device.isIOS ? 'iOS' : device.isAndroid ? 'Android' : 'Other'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Touch Support</span>
+                        <span class="info-value">${device.hasTouch ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Screen Size</span>
+                        <span class="info-value">${device.screenSize.width} x ${device.screenSize.height}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Pixel Ratio</span>
+                        <span class="info-value">${device.screenSize.pixelRatio}x</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Orientation</span>
+                        <span class="info-value">${device.orientation}</span>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <div class="info-title">Browser Information</div>
+                    <div class="info-item">
+                        <span class="info-label">Browser</span>
+                        <span class="info-value">${browser.name}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Version</span>
+                        <span class="info-value">${browser.version}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Language</span>
+                        <span class="info-value">${browser.language}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Online</span>
+                        <span class="info-value">${browser.onLine ? 'Yes' : 'No'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Populate limitations
+        function populateLimitations() {
+            const limitationsList = document.getElementById('limitations-list');
+            const limitations = detector.getMobileLimitations();
+
+            if (limitations.length === 0) {
+                limitationsList.innerHTML = `
+                    <div class="info-card">
+                        <div class="info-title">No Limitations Detected</div>
+                        <p style="color: #757575; padding: 8px 0;">
+                            Your browser supports all required features for optimal Kizuna experience.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            limitations.forEach(limitation => {
+                html += `
+                    <div class="limitation-card">
+                        <div class="limitation-title">${limitation.feature}</div>
+                        <span class="limitation-impact ${limitation.impact}">${limitation.impact.toUpperCase()} IMPACT</span>
+                        <div class="limitation-message">${limitation.message}</div>
+                        <div class="limitation-fallback">Fallback: ${limitation.fallback}</div>
+                    </div>
+                `;
+            });
+            limitationsList.innerHTML = html;
+        }
+
+        // Initialize demo
+        function initializeDemo() {
+            const demoContainer = document.getElementById('demo-container');
+
+            // Create a simple file transfer demo
+            const mockSDK = {
+                on: () => { },
+                uploadFile: () => Promise.resolve(),
+                requestVideoStream: () => Promise.resolve(null)
+            };
+
+            new KizunaMobile.MobileFileTransferUI(demoContainer, mockSDK);
+        }
+
+        // Initialize all sections
+        populateFeatures();
+        populateDeviceInfo();
+        populateLimitations();
+        initializeDemo();
+
+        // Handle orientation changes
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                populateDeviceInfo();
+            }, 100);
+        });
+    </script>
+</body>
+
+</html>

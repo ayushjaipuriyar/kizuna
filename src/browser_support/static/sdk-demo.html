@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kizuna SDK Demo</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2 {
+            color: #34495e;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+        }
+
+        button.success {
+            background: #27ae60;
+        }
+
+        button.success:hover {
+            background: #229954;
+        }
+
+        input[type="text"],
+        input[type="file"],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        textarea {
+            min-height: 100px;
+            font-family: monospace;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .log {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+        }
+
+        .log-entry.error {
+            color: #e74c3c;
+        }
+
+        .log-entry.success {
+            color: #2ecc71;
+        }
+
+        .log-entry.info {
+            color: #3498db;
+        }
+
+        .transfer-item,
+        .command-item {
+            background: #f8f9fa;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .drop-zone {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            color: #7f8c8d;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            background: #ebf5fb;
+            border-color: #2980b9;
+            color: #2980b9;
+        }
+
+        .kizuna-terminal {
+            background: #1e1e1e;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            color: #d4d4d4;
+        }
+
+        .terminal-output {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+
+        .terminal-line {
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+
+        .terminal-command {
+            color: #4ec9b0;
+        }
+
+        .terminal-output {
+            color: #d4d4d4;
+        }
+
+        .terminal-error {
+            color: #f48771;
+        }
+
+        .terminal-system {
+            color: #569cd6;
+        }
+
+        .terminal-input-line {
+            display: flex;
+            align-items: center;
+            background: #252526;
+            padding: 8px;
+            border-radius: 3px;
+        }
+
+        .terminal-prompt {
+            color: #4ec9b0;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #d4d4d4;
+            outline: none;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔗 Kizuna Browser SDK Demo</h1>
+
+        <!-- Connection Section -->
+        <div class="section">
+            <h2>Connection</h2>
+            <div id="connection-status" class="status info">Not connected</div>
+            <input type="text" id="setup-id" placeholder="Enter Setup ID">
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()" class="danger">Disconnect</button>
+            <button onclick="getStatus()">Get Status</button>
+            <div id="connection-log" class="log"></div>
+        </div>
+
+        <div class="grid">
+            <!-- File Transfer Section -->
+            <div class="section">
+                <h2>File Transfer</h2>
+                <div id="drop-zone" class="drop-zone">
+                    <p>📁 Drag and drop files here</p>
+                    <p style="font-size: 12px; margin-top: 10px;">or</p>
+                    <input type="file" id="file-input" multiple style="margin-top: 10px;">
+                </div>
+                <button onclick="uploadSelectedFiles()">Upload Selected Files</button>
+                <div id="transfers-list"></div>
+            </div>
+
+            <!-- Clipboard Section -->
+            <div class="section">
+                <h2>Clipboard Sync</h2>
+                <div id="clipboard-status" class="status info">Clipboard sync disabled</div>
+                <button onclick="enableClipboard()">Enable Sync</button>
+                <button onclick="disableClipboard()" class="danger">Disable Sync</button>
+                <button onclick="requestPermission()">Request Permission</button>
+                <textarea id="clipboard-content" placeholder="Clipboard content will appear here..."></textarea>
+                <button onclick="copyToClipboard()">Copy to Clipboard</button>
+                <button onclick="pasteFromClipboard()">Paste from Clipboard</button>
+            </div>
+        </div>
+
+        <!-- Command Execution Section -->
+        <div class="section">
+            <h2>Command Execution</h2>
+            <div id="terminal-container"></div>
+            <div style="margin-top: 15px;">
+                <button onclick="clearTerminal()">Clear Terminal</button>
+                <button onclick="showHistory()">Show History</button>
+                <button onclick="saveTemplate()">Save Template</button>
+                <button onclick="showTemplates()">Show Templates</button>
+            </div>
+        </div>
+
+        <!-- Event Log Section -->
+        <div class="section">
+            <h2>Event Log</h2>
+            <button onclick="clearEventLog()">Clear Log</button>
+            <div id="event-log" class="log"></div>
+        </div>
+    </div>
+
+    <!-- Load SDK Scripts -->
+    <script src="kizuna-sdk.js"></script>
+    <script src="kizuna-file-transfer.js"></script>
+    <script src="kizuna-clipboard.js"></script>
+    <script src="kizuna-command.js"></script>
+
+    <script>
+        // Initialize SDK
+        let sdk = null;
+        let fileTransfer = null;
+        let clipboard = null;
+        let commandManager = null;
+        let terminal = null;
+
+        function initializeSDK() {
+            sdk = new KizunaSDK({
+                debug: true,
+                autoReconnect: true
+            });
+
+            fileTransfer = new KizunaFileTransfer(sdk);
+            clipboard = new KizunaClipboard(sdk);
+            commandManager = new KizunaCommand(sdk);
+
+            // Setup terminal
+            const terminalContainer = document.getElementById('terminal-container');
+            terminal = new KizunaTerminal(commandManager, terminalContainer);
+            terminal.setPeerId('default');
+
+            setupEventListeners();
+            logEvent('SDK initialized', 'success');
+        }
+
+        function setupEventListeners() {
+            // Connection events
+            sdk.on('connectionStateChange', (data) => {
+                updateConnectionStatus(data.state);
+                logEvent(`Connection state: ${data.state}`, 'info');
+            });
+
+            sdk.on('connected', (data) => {
+                logEvent(`Connected via ${data.protocol}`, 'success');
+            });
+
+            sdk.on('disconnected', (data) => {
+                logEvent(`Disconnected: ${data.reason}`, 'error');
+            });
+
+            sdk.on('error', (data) => {
+                logEvent(`Error: ${data.error.message}`, 'error');
+            });
+
+            // File transfer events
+            sdk.on('fileTransferStarted', ({ transfer }) => {
+                logEvent(`File transfer started: ${transfer.fileName}`, 'info');
+                updateTransfersList();
+            });
+
+            sdk.on('fileTransferProgress', ({ transfer }) => {
+                updateTransfersList();
+            });
+
+            sdk.on('fileTransferComplete', ({ transfer }) => {
+                logEvent(`File transfer complete: ${transfer.fileName}`, 'success');
+                updateTransfersList();
+            });
+
+            sdk.on('fileTransferError', ({ transfer, error }) => {
+                logEvent(`File transfer error: ${error.message}`, 'error');
+            });
+
+            // Clipboard events
+            sdk.on('clipboardEnabled', () => {
+                updateClipboardStatus('enabled');
+                logEvent('Clipboard sync enabled', 'success');
+            });
+
+            sdk.on('clipboardDisabled', () => {
+                updateClipboardStatus('disabled');
+                logEvent('Clipboard sync disabled', 'info');
+            });
+
+            sdk.on('clipboardSynced', ({ direction, content }) => {
+                logEvent(`Clipboard synced (${direction})`, 'success');
+                if (direction === 'incoming') {
+                    document.getElementById('clipboard-content').value = content;
+                }
+            });
+
+            sdk.on('clipboardPermissionGranted', () => {
+                logEvent('Clipboard permission granted', 'success');
+            });
+
+            sdk.on('clipboardPermissionDenied', () => {
+                logEvent('Clipboard permission denied', 'error');
+            });
+
+            // Command events
+            sdk.on('commandStarted', ({ execution }) => {
+                logEvent(`Command started: ${execution.command}`, 'info');
+            });
+
+            sdk.on('commandComplete', ({ execution }) => {
+                logEvent(`Command completed: exit code ${execution.exitCode}`, 'success');
+            });
+
+            sdk.on('commandError', ({ execution, error }) => {
+                logEvent(`Command error: ${error.message}`, 'error');
+            });
+
+            // Setup drag and drop
+            fileTransfer.setupDragAndDrop(document.getElementById('drop-zone'), {
+                peerId: 'default',
+                onFilesSelected: (files) => {
+                    logEvent(`${files.length} file(s) selected for upload`, 'info');
+                }
+            });
+        }
+
+        async function connect() {
+            const setupId = document.getElementById('setup-id').value.trim();
+            if (!setupId) {
+                alert('Please enter a Setup ID');
+                return;
+            }
+
+            try {
+                logEvent('Connecting...', 'info');
+                await sdk.connect(setupId);
+            } catch (error) {
+                logEvent(`Connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function disconnect() {
+            try {
+                await sdk.disconnect();
+                logEvent('Disconnected', 'info');
+            } catch (error) {
+                logEvent(`Disconnect error: ${error.message}`, 'error');
+            }
+        }
+
+        function getStatus() {
+            const status = sdk.getConnectionStatus();
+            logEvent(`Status: ${JSON.stringify(status, null, 2)}`, 'info');
+        }
+
+        async function uploadSelectedFiles() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                alert('Please select files to upload');
+                return;
+            }
+
+            for (const file of files) {
+                try {
+                    await fileTransfer.uploadFile(file, 'default', {
+                        onProgress: (progress) => {
+                            updateTransfersList();
+                        }
+                    });
+                } catch (error) {
+                    logEvent(`Upload failed: ${error.message}`, 'error');
+                }
+            }
+
+            fileInput.value = '';
+        }
+
+        function updateTransfersList() {
+            const transfers = fileTransfer.getActiveTransfers();
+            const listEl = document.getElementById('transfers-list');
+
+            if (transfers.length === 0) {
+                listEl.innerHTML = '<p style="color: #7f8c8d; margin-top: 10px;">No active transfers</p>';
+                return;
+            }
+
+            listEl.innerHTML = transfers.map(t => `
+                <div class="transfer-item">
+                    <strong>${t.fileName}</strong> (${formatBytes(t.fileSize)})<br>
+                    <small>Status: ${t.status}</small>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${t.progress}%">
+                            ${Math.round(t.progress)}%
+                        </div>
+                    </div>
+                    ${t.status === 'transferring' ? `
+                        <button onclick="pauseTransfer('${t.id}')">Pause</button>
+                        <button onclick="cancelTransfer('${t.id}')" class="danger">Cancel</button>
+                    ` : ''}
+                    ${t.status === 'paused' ? `
+                        <button onclick="resumeTransfer('${t.id}')">Resume</button>
+                        <button onclick="cancelTransfer('${t.id}')" class="danger">Cancel</button>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function pauseTransfer(id) {
+            fileTransfer.pauseTransfer(id);
+            updateTransfersList();
+        }
+
+        async function resumeTransfer(id) {
+            await fileTransfer.resumeTransfer(id);
+            updateTransfersList();
+        }
+
+        async function cancelTransfer(id) {
+            await fileTransfer.cancelTransfer(id);
+            updateTransfersList();
+        }
+
+        async function requestPermission() {
+            try {
+                const granted = await clipboard.requestPermission();
+                if (granted) {
+                    logEvent('Clipboard permission granted', 'success');
+                } else {
+                    logEvent('Clipboard permission denied', 'error');
+                }
+            } catch (error) {
+                logEvent(`Permission error: ${error.message}`, 'error');
+            }
+        }
+
+        async function enableClipboard() {
+            try {
+                await clipboard.enable({ autoSync: true });
+            } catch (error) {
+                logEvent(`Enable clipboard error: ${error.message}`, 'error');
+            }
+        }
+
+        async function disableClipboard() {
+            try {
+                await clipboard.disable();
+            } catch (error) {
+                logEvent(`Disable clipboard error: ${error.message}`, 'error');
+            }
+        }
+
+        async function copyToClipboard() {
+            const content = document.getElementById('clipboard-content').value;
+            try {
+                await clipboard.copyToClipboard(content);
+                logEvent('Copied to clipboard', 'success');
+            } catch (error) {
+                logEvent(`Copy error: ${error.message}`, 'error');
+            }
+        }
+
+        async function pasteFromClipboard() {
+            try {
+                const content = await clipboard.pasteFromClipboard();
+                document.getElementById('clipboard-content').value = content;
+                logEvent('Pasted from clipboard', 'success');
+            } catch (error) {
+                logEvent(`Paste error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearTerminal() {
+            terminal.clear();
+        }
+
+        function showHistory() {
+            const history = commandManager.getHistory();
+            logEvent(`Command history (${history.length} commands):\n${history.join('\n')}`, 'info');
+        }
+
+        function saveTemplate() {
+            const name = prompt('Template name:');
+            const command = prompt('Command template:');
+            if (name && command) {
+                commandManager.saveTemplate(name, command);
+                logEvent(`Template saved: ${name}`, 'success');
+            }
+        }
+
+        function showTemplates() {
+            const templates = commandManager.getAllTemplates();
+            logEvent(`Saved templates (${templates.length}):\n${templates.map(t => `${t.name}: ${t.command}`).join('\n')}`, 'info');
+        }
+
+        function updateConnectionStatus(state) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.textContent = `Connection: ${state}`;
+            statusEl.className = 'status ' + (state === 'connected' ? 'success' : state === 'connecting' ? 'warning' : 'info');
+        }
+
+        function updateClipboardStatus(state) {
+            const statusEl = document.getElementById('clipboard-status');
+            statusEl.textContent = `Clipboard sync: ${state}`;
+            statusEl.className = 'status ' + (state === 'enabled' ? 'success' : 'info');
+        }
+
+        function logEvent(message, type = 'info') {
+            const logEl = document.getElementById('event-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+
+            // Also log to connection log
+            const connLogEl = document.getElementById('connection-log');
+            const connEntry = document.createElement('div');
+            connEntry.className = `log-entry ${type}`;
+            connEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            connLogEl.appendChild(connEntry);
+            connLogEl.scrollTop = connLogEl.scrollHeight;
+        }
+
+        function clearEventLog() {
+            document.getElementById('event-log').innerHTML = '';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Initialize on page load
+        window.onload = initializeSDK;
+    </script>
+</body>
+
+</html>

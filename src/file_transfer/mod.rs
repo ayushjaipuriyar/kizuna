@@ -20,11 +20,15 @@ pub mod security_integration;
 pub mod transport_integration;
 pub mod progress;
 pub mod api;
+pub mod notification;
+pub mod incoming;
 
 pub use error::{FileTransferError, Result};
 pub use types::*;
 pub use api::{FileTransferSystem, TransferStats};
 pub use progress::{ProgressTracker, ProgressCallback, EventCallback, TransferEvent};
+pub use notification::{NotificationManager, NotificationCallback, TransferNotification, TransferStatus, FileStatus, FileTransferState};
+pub use incoming::{IncomingTransferManager, IncomingTransferRequest, IncomingRequestState, TransferResponse, TransferRequestDetails};
 pub use security_integration::{FileTransferSecurity, SecureTransferSession, SecureTransfer};
 pub use transport_integration::{FileTransferTransport, ProtocolConfig, ConnectionPoolStats};
 

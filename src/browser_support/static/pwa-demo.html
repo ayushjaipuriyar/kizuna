@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kizuna PWA Demo</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Progressive Web App features demonstration">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #2196F3;
+            margin-top: 0;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #1976D2;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #e9ecef;
+        }
+
+        .status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+        }
+
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 Kizuna PWA Demo</h1>
+
+        <!-- Installation Section -->
+        <div class="section">
+            <h2>📱 Installation</h2>
+            <div id="install-status" class="status"></div>
+            <button id="install-btn" onclick="installApp()">Install App</button>
+            <button onclick="checkInstallStatus()">Check Status</button>
+            <div id="install-instructions" class="info"></div>
+        </div>
+
+        <!-- Service Worker Section -->
+        <div class="section">
+            <h2>⚙️ Service Worker</h2>
+            <div id="sw-status" class="status"></div>
+            <button onclick="registerServiceWorker()">Register Service Worker</button>
+            <button onclick="updateServiceWorker()">Check for Updates</button>
+            <button onclick="unregisterServiceWorker()">Unregister</button>
+        </div>
+
+        <!-- Offline Status Section -->
+        <div class="section">
+            <h2>🌐 Network Status</h2>
+            <div id="network-status" class="status"></div>
+            <button onclick="simulateOffline()">Simulate Offline</button>
+            <button onclick="simulateOnline()">Simulate Online</button>
+        </div>
+
+        <!-- Notifications Section -->
+        <div class="section">
+            <h2>🔔 Push Notifications</h2>
+            <div id="notification-status" class="status"></div>
+            <button onclick="requestNotificationPermission()">Request Permission</button>
+            <button onclick="subscribeToNotifications()">Subscribe</button>
+            <button onclick="showTestNotification()">Show Test Notification</button>
+            <button onclick="unsubscribeFromNotifications()">Unsubscribe</button>
+        </div>
+
+        <!-- Cache Management Section -->
+        <div class="section">
+            <h2>💾 Cache Management</h2>
+            <div id="cache-status" class="status"></div>
+            <button onclick="getCacheStats()">Get Cache Stats</button>
+            <button onclick="clearCache()">Clear Cache</button>
+            <button onclick="checkStorageQuota()">Check Storage Quota</button>
+            <pre id="cache-info"></pre>
+        </div>
+
+        <!-- Offline Data Section -->
+        <div class="section">
+            <h2>📦 Offline Data</h2>
+            <button onclick="saveOfflineData()">Save Test Data</button>
+            <button onclick="loadOfflineData()">Load Test Data</button>
+            <button onclick="queueOperation()">Queue Operation</button>
+            <button onclick="viewQueuedOperations()">View Queue</button>
+            <pre id="offline-data"></pre>
+        </div>
+    </div>
+
+    <!-- PWA Scripts -->
+    <script src="/kizuna-pwa.js"></script>
+    <script src="/kizuna-install.js"></script>
+    <script src="/kizuna-notifications.js"></script>
+    <script src="/kizuna-cache.js"></script>
+
+    <script>
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateNetworkStatus();
+            checkInstallStatus();
+            checkServiceWorkerStatus();
+            checkNotificationStatus();
+
+            // Listen for network changes
+            if (window.KizunaPWA) {
+                window.KizunaPWA.on('online', updateNetworkStatus);
+                window.KizunaPWA.on('offline', updateNetworkStatus);
+            }
+        });
+
+        // Installation functions
+        async function installApp() {
+            if (!window.KizunaInstall) {
+                alert('Install manager not available');
+                return;
+            }
+
+            try {
+                const result = await window.KizunaInstall.showInstallPrompt();
+                checkInstallStatus();
+            } catch (error) {
+                alert('Installation failed: ' + error.message);
+            }
+        }
+
+        function checkInstallStatus() {
+            if (!window.KizunaInstall) return;
+
+            const status = window.KizunaInstall.getInstallStatus();
+            const statusEl = document.getElementById('install-status');
+            const btnEl = document.getElementById('install-btn');
+            const instructionsEl = document.getElementById('install-instructions');
+
+            if (status.isInstalled) {
+                statusEl.textContent = '✅ App is installed';
+                statusEl.className = 'status online';
+                btnEl.disabled = true;
+            } else if (status.canInstall) {
+                statusEl.textContent = '📲 App can be installed';
+                statusEl.className = 'status';
+                btnEl.disabled = false;
+            } else {
+                statusEl.textContent = '❌ Installation not available';
+                statusEl.className = 'status offline';
+                btnEl.disabled = true;
+            }
+
+            const instructions = window.KizunaInstall.getInstallInstructions();
+            instructionsEl.textContent = instructions.instructions;
+        }
+
+        // Service Worker functions
+        async function registerServiceWorker() {
+            if (!window.KizunaPWA) {
+                alert('PWA manager not available');
+                return;
+            }
+
+            try {
+                await window.KizunaPWA.registerServiceWorker();
+                checkServiceWorkerStatus();
+            } catch (error) {
+                alert('Service worker registration failed: ' + error.message);
+            }
+        }
+
+        async function updateServiceWorker() {
+            if (!window.KizunaPWA) return;
+
+            try {
+                await window.KizunaPWA.updateServiceWorker();
+                alert('Update check complete');
+            } catch (error) {
+                alert('Update check failed: ' + error.message);
+            }
+        }
+
+        async function unregisterServiceWorker() {
+            if (!('serviceWorker' in navigator)) return;
+
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    await registration.unregister();
+                    checkServiceWorkerStatus();
+                }
+            } catch (error) {
+                alert('Unregister failed: ' + error.message);
+            }
+        }
+
+        async function checkServiceWorkerStatus() {
+            const statusEl = document.getElementById('sw-status');
+
+            if (!('serviceWorker' in navigator)) {
+                statusEl.textContent = '❌ Service workers not supported';
+                statusEl.className = 'status offline';
+                return;
+            }
+
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    statusEl.textContent = '✅ Service worker registered';
+                    statusEl.className = 'status online';
+                } else {
+                    statusEl.textContent = '⚠️ Service worker not registered';
+                    statusEl.className = 'status';
+                }
+            } catch (error) {
+                statusEl.textContent = '❌ Error checking status';
+                statusEl.className = 'status offline';
+            }
+        }
+
+        // Network functions
+        function updateNetworkStatus() {
+            const statusEl = document.getElementById('network-status');
+            const isOnline = window.KizunaPWA ? window.KizunaPWA.isOnline : navigator.onLine;
+
+            if (isOnline) {
+                statusEl.textContent = '✅ Online';
+                statusEl.className = 'status online';
+            } else {
+                statusEl.textContent = '❌ Offline';
+                statusEl.className = 'status offline';
+            }
+        }
+
+        function simulateOffline() {
+            alert('To test offline mode, use browser DevTools Network tab to go offline');
+        }
+
+        function simulateOnline() {
+            alert('To test online mode, use browser DevTools Network tab to go online');
+        }
+
+        // Notification functions
+        async function requestNotificationPermission() {
+            if (!window.KizunaNotifications) {
+                alert('Notifications manager not available');
+                return;
+            }
+
+            try {
+                const permission = await window.KizunaNotifications.requestPermission();
+                checkNotificationStatus();
+            } catch (error) {
+                alert('Permission request failed: ' + error.message);
+            }
+        }
+
+        async function subscribeToNotifications() {
+            if (!window.KizunaNotifications) return;
+
+            try {
+                await window.KizunaNotifications.subscribe();
+                checkNotificationStatus();
+            } catch (error) {
+                alert('Subscription failed: ' + error.message);
+            }
+        }
+
+        async function showTestNotification() {
+            if (!window.KizunaNotifications) return;
+
+            try {
+                await window.KizunaNotifications.showNotification('Test Notification', {
+                    body: 'This is a test notification from Kizuna PWA',
+                    icon: '/icons/icon-192.png',
+                });
+            } catch (error) {
+                alert('Notification failed: ' + error.message);
+            }
+        }
+
+        async function unsubscribeFromNotifications() {
+            if (!window.KizunaNotifications) return;
+
+            try {
+                await window.KizunaNotifications.unsubscribe();
+                checkNotificationStatus();
+            } catch (error) {
+                alert('Unsubscribe failed: ' + error.message);
+            }
+        }
+
+        function checkNotificationStatus() {
+            if (!window.KizunaNotifications) return;
+
+            const status = window.KizunaNotifications.getStatus();
+            const statusEl = document.getElementById('notification-status');
+
+            if (status.enabled) {
+                statusEl.textContent = '✅ Notifications enabled and subscribed';
+                statusEl.className = 'status online';
+            } else if (status.permission === 'granted') {
+                statusEl.textContent = '⚠️ Permission granted but not subscribed';
+                statusEl.className = 'status';
+            } else {
+                statusEl.textContent = '❌ Notifications not enabled';
+                statusEl.className = 'status offline';
+            }
+        }
+
+        // Cache functions
+        async function getCacheStats() {
+            if (!window.KizunaCache) return;
+
+            try {
+                const stats = await window.KizunaCache.getStatistics();
+                document.getElementById('cache-info').textContent = JSON.stringify(stats, null, 2);
+                document.getElementById('cache-status').textContent = '✅ Cache stats loaded';
+            } catch (error) {
+                alert('Failed to get cache stats: ' + error.message);
+            }
+        }
+
+        async function clearCache() {
+            if (!window.KizunaCache) return;
+
+            if (!confirm('Clear all caches?')) return;
+
+            try {
+                const count = await window.KizunaCache.clearAllCaches();
+                alert(`Cleared ${count} caches`);
+                getCacheStats();
+            } catch (error) {
+                alert('Failed to clear cache: ' + error.message);
+            }
+        }
+
+        async function checkStorageQuota() {
+            if (!window.KizunaCache) return;
+
+            try {
+                const quota = await window.KizunaCache.checkStorageQuota();
+                document.getElementById('cache-info').textContent = JSON.stringify(quota, null, 2);
+            } catch (error) {
+                alert('Failed to check storage quota: ' + error.message);
+            }
+        }
+
+        // Offline data functions
+        async function saveOfflineData() {
+            if (!window.KizunaPWA) return;
+
+            try {
+                await window.KizunaPWA.saveSetting('test-data', {
+                    message: 'Hello from offline storage!',
+                    timestamp: Date.now(),
+                });
+                alert('Data saved to offline storage');
+            } catch (error) {
+                alert('Failed to save data: ' + error.message);
+            }
+        }
+
+        async function loadOfflineData() {
+            if (!window.KizunaPWA) return;
+
+            try {
+                const data = await window.KizunaPWA.getSetting('test-data');
+                document.getElementById('offline-data').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                alert('Failed to load data: ' + error.message);
+            }
+        }
+
+        async function queueOperation() {
+            if (!window.KizunaPWA) return;
+
+            try {
+                const id = await window.KizunaPWA.queueOperation('test-operation', {
+                    action: 'test',
+                    timestamp: Date.now(),
+                });
+                alert(`Operation queued with ID: ${id}`);
+            } catch (error) {
+                alert('Failed to queue operation: ' + error.message);
+            }
+        }
+
+        async function viewQueuedOperations() {
+            if (!window.KizunaPWA) return;
+
+            try {
+                const operations = await window.KizunaPWA.getQueuedOperations();
+                document.getElementById('offline-data').textContent = JSON.stringify(operations, null, 2);
+            } catch (error) {
+                alert('Failed to view operations: ' + error.message);
+            }
+        }
+    </script>
+</body>
+
+</html>

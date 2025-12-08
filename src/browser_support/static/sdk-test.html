@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kizuna SDK Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .test {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .test.pass {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .test.fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Kizuna SDK Test Suite</h1>
+    <div id="results"></div>
+
+    <script src="kizuna-sdk.js"></script>
+    <script src="kizuna-file-transfer.js"></script>
+    <script src="kizuna-clipboard.js"></script>
+    <script src="kizuna-command.js"></script>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function test(name, fn) {
+            try {
+                fn();
+                results.innerHTML += `<div class="test pass">✓ ${name}</div>`;
+                return true;
+            } catch (error) {
+                results.innerHTML += `<div class="test fail">✗ ${name}: ${error.message}</div>`;
+                return false;
+            }
+        }
+
+        // Test SDK initialization
+        test('KizunaSDK class exists', () => {
+            if (typeof KizunaSDK !== 'function') throw new Error('KizunaSDK not found');
+        });
+
+        test('KizunaSDK can be instantiated', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            if (!sdk) throw new Error('Failed to create SDK instance');
+        });
+
+        test('KizunaSDK has required methods', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const methods = ['connect', 'disconnect', 'sendMessage', 'on', 'off', 'once', 'getConnectionStatus'];
+            methods.forEach(method => {
+                if (typeof sdk[method] !== 'function') {
+                    throw new Error(`Missing method: ${method}`);
+                }
+            });
+        });
+
+        test('KizunaSDK detects capabilities', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            if (!sdk.capabilities) throw new Error('Capabilities not detected');
+            if (typeof sdk.capabilities.supports_webrtc !== 'boolean') {
+                throw new Error('WebRTC capability not detected');
+            }
+        });
+
+        // Test File Transfer
+        test('KizunaFileTransfer class exists', () => {
+            if (typeof KizunaFileTransfer !== 'function') throw new Error('KizunaFileTransfer not found');
+        });
+
+        test('FileTransferManager can be instantiated', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const fileTransfer = new KizunaFileTransfer(sdk);
+            if (!fileTransfer) throw new Error('Failed to create FileTransferManager');
+        });
+
+        test('FileTransferManager has required methods', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const fileTransfer = new KizunaFileTransfer(sdk);
+            const methods = ['uploadFile', 'downloadFile', 'pauseTransfer', 'resumeTransfer',
+                'cancelTransfer', 'getActiveTransfers', 'setupDragAndDrop'];
+            methods.forEach(method => {
+                if (typeof fileTransfer[method] !== 'function') {
+                    throw new Error(`Missing method: ${method}`);
+                }
+            });
+        });
+
+        // Test Clipboard
+        test('KizunaClipboard class exists', () => {
+            if (typeof KizunaClipboard !== 'function') throw new Error('KizunaClipboard not found');
+        });
+
+        test('ClipboardManager can be instantiated', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const clipboard = new KizunaClipboard(sdk);
+            if (!clipboard) throw new Error('Failed to create ClipboardManager');
+        });
+
+        test('ClipboardManager has required methods', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const clipboard = new KizunaClipboard(sdk);
+            const methods = ['isSupported', 'requestPermission', 'enable', 'disable',
+                'copyToClipboard', 'pasteFromClipboard', 'getStatus'];
+            methods.forEach(method => {
+                if (typeof clipboard[method] !== 'function') {
+                    throw new Error(`Missing method: ${method}`);
+                }
+            });
+        });
+
+        test('ClipboardManager detects API support', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const clipboard = new KizunaClipboard(sdk);
+            if (typeof clipboard.isSupported() !== 'boolean') {
+                throw new Error('isSupported() should return boolean');
+            }
+        });
+
+        // Test Command Execution
+        test('KizunaCommand class exists', () => {
+            if (typeof KizunaCommand !== 'function') throw new Error('KizunaCommand not found');
+        });
+
+        test('CommandExecutionManager can be instantiated', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const commandManager = new KizunaCommand(sdk);
+            if (!commandManager) throw new Error('Failed to create CommandExecutionManager');
+        });
+
+        test('CommandExecutionManager has required methods', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const commandManager = new KizunaCommand(sdk);
+            const methods = ['executeCommand', 'terminateCommand', 'sendInput', 'getActiveCommands',
+                'getHistory', 'saveTemplate', 'getTemplate', 'executeTemplate'];
+            methods.forEach(method => {
+                if (typeof commandManager[method] !== 'function') {
+                    throw new Error(`Missing method: ${method}`);
+                }
+            });
+        });
+
+        // Test Terminal Interface
+        test('KizunaTerminal class exists', () => {
+            if (typeof KizunaTerminal !== 'function') throw new Error('KizunaTerminal not found');
+        });
+
+        test('TerminalInterface can be instantiated', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            const commandManager = new KizunaCommand(sdk);
+            const container = document.createElement('div');
+            const terminal = new KizunaTerminal(commandManager, container);
+            if (!terminal) throw new Error('Failed to create TerminalInterface');
+        });
+
+        // Test Event System
+        test('Event system works', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            let called = false;
+            sdk.on('test', () => { called = true; });
+            sdk._emit('test');
+            if (!called) throw new Error('Event listener not called');
+        });
+
+        test('Event system supports once()', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            let count = 0;
+            sdk.once('test', () => { count++; });
+            sdk._emit('test');
+            sdk._emit('test');
+            if (count !== 1) throw new Error('once() listener called multiple times');
+        });
+
+        test('Event system supports off()', () => {
+            const sdk = new KizunaSDK({ debug: false });
+            let called = false;
+            const listener = () => { called = true; };
+            sdk.on('test', listener);
+            sdk.off('test', listener);
+            sdk._emit('test');
+            if (called) throw new Error('Removed listener was called');
+        });
+
+        // Test Configuration
+        test('SDK accepts configuration', () => {
+            const config = {
+                apiBaseUrl: 'http://test.com',
+                autoReconnect: false,
+                debug: true
+            };
+            const sdk = new KizunaSDK(config);
+            if (sdk.config.apiBaseUrl !== config.apiBaseUrl) {
+                throw new Error('Configuration not applied');
+            }
+        });
+
+        // Summary
+        const allTests = document.querySelectorAll('.test');
+        const passed = document.querySelectorAll('.test.pass').length;
+        const failed = document.querySelectorAll('.test.fail').length;
+
+        results.innerHTML += `
+            <div style="margin-top: 20px; padding: 15px; background: ${failed === 0 ? '#d4edda' : '#fff3cd'}; 
+                        border-radius: 5px; font-weight: bold;">
+                Tests: ${allTests.length} | Passed: ${passed} | Failed: ${failed}
+            </div>
+        `;
+
+        console.log(`SDK Tests Complete: ${passed}/${allTests.length} passed`);
+    </script>
+</body>
+
+</html>

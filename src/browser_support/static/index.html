@@ -1,19 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kizuna Browser Support</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Peer-to-peer file sharing and communication platform">
+    <meta name="theme-color" content="#2196F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Kizuna">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120.png">
+
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .feature { background: #f8f9fa; padding: 20px; margin: 15px 0; border-radius: 5px; }
-        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
-        button:hover { background: #0056b3; }
-        .qr-code { text-align: center; margin: 20px 0; }
-        #setup-info { background: #e9ecef; padding: 15px; border-radius: 5px; margin: 15px 0; display: none; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .qr-code {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        #setup-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: none;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Kizuna Browser Support</h1>
@@ -26,7 +91,9 @@
                 <h4>Connection Setup Created</h4>
                 <p><strong>Setup ID:</strong> <span id="setup-id"></span></p>
                 <p><strong>Connection URL:</strong> <a id="connection-url" href="#" target="_blank"></a></p>
-                <div class="qr-code"><div id="qr-code-container"></div></div>
+                <div class="qr-code">
+                    <div id="qr-code-container"></div>
+                </div>
                 <p><em>This setup expires in 5 minutes</em></p>
             </div>
         </div>
@@ -104,4 +171,48 @@
         }
     </script>
 </body>
+
 </html>
+
+<!-- Compatibility and Feature Detection Scripts -->
+<script src="/kizuna-feature-detection.js"></script>
+<script src="/kizuna-compatibility.js"></script>
+<script src="/kizuna-graceful-degradation.js"></script>
+<script src="/kizuna-api-versioning.js"></script>
+<script src="/kizuna-compatibility-integration.js"></script>
+
+<!-- PWA Scripts -->
+<script src="/kizuna-pwa.js"></script>
+<script src="/kizuna-install.js"></script>
+<script>
+    // Initialize PWA features
+    document.addEventListener('DOMContentLoaded', () => {
+        // Show install banner if available
+        if (window.KizunaInstall && window.KizunaInstall.canInstall()) {
+            window.KizunaInstall.showInstallBanner({
+                message: 'Install Kizuna for offline access and better performance',
+                position: 'bottom',
+                dismissible: true,
+            });
+        }
+
+        // Log PWA status
+        if (window.KizunaPWA) {
+            console.log('PWA Status:', {
+                isInstalled: window.KizunaInstall.isInstalled,
+                isOnline: window.KizunaPWA.isOnline,
+            });
+        }
+
+        // Log compatibility status
+        if (window.KizunaCompatibilityIntegration) {
+            const report = window.KizunaCompatibilityIntegration.integration.getCompatibilityReport();
+            console.log('Compatibility Report:', report);
+
+            const canRun = window.KizunaCompatibilityIntegration.integration.canRunSDK();
+            if (!canRun.canRun) {
+                alert('Warning: ' + canRun.reason);
+            }
+        }
+    });
+</script>

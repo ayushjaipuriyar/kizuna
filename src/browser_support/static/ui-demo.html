@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kizuna UI Components Demo</title>
+    <link rel="stylesheet" href="kizuna-ui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+        }
+
+        .demo-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .demo-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .demo-header h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .demo-header p {
+            color: var(--text-secondary);
+        }
+
+        .demo-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .demo-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            margin-bottom: -2px;
+        }
+
+        .demo-tab:hover {
+            color: var(--primary-color);
+        }
+
+        .demo-tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .demo-content {
+            display: none;
+        }
+
+        .demo-content.active {
+            display: block;
+        }
+
+        .component-wrapper {
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>Kizuna UI Components</h1>
+            <p>Interactive demo of browser UI components</p>
+        </div>
+
+        <div class="demo-tabs">
+            <button class="demo-tab active" data-tab="file-transfer">File Transfer</button>
+            <button class="demo-tab" data-tab="video-player">Video Player</button>
+            <button class="demo-tab" data-tab="terminal">Command Terminal</button>
+            <button class="demo-tab" data-tab="peers">Peer Management</button>
+        </div>
+
+        <div id="file-transfer" class="demo-content active">
+            <div class="component-wrapper">
+                <div id="file-transfer-container"></div>
+            </div>
+        </div>
+
+        <div id="video-player" class="demo-content">
+            <div class="component-wrapper">
+                <div id="video-player-container"></div>
+            </div>
+        </div>
+
+        <div id="terminal" class="demo-content">
+            <div class="component-wrapper">
+                <div id="terminal-container"></div>
+            </div>
+        </div>
+
+        <div id="peers" class="demo-content">
+            <div class="component-wrapper">
+                <div id="peers-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="kizuna-sdk.js"></script>
+    <script src="kizuna-ui.js"></script>
+    <script>
+        // Initialize SDK with mock functionality for demo
+        const sdk = new KizunaSDK({ debug: true });
+
+        // Mock SDK methods for demo purposes
+        sdk.uploadFile = async function (file, progressCallback) {
+            return new Promise((resolve) => {
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 10;
+                    progressCallback(progress);
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                        resolve();
+                    }
+                }, 500);
+            });
+        };
+
+        sdk.requestVideoStream = async function () {
+            // Mock video stream
+            return new MediaStream();
+        };
+
+        sdk.setVideoQuality = function (quality) {
+            console.log('Setting video quality to:', quality);
+        };
+
+        sdk.executeCommand = async function (command) {
+            setTimeout(() => {
+                this._emit('commandOutput', { output: `Executing: ${command}` });
+                setTimeout(() => {
+                    this._emit('commandOutput', { output: 'Command output...' });
+                    setTimeout(() => {
+                        this._emit('commandComplete', { exitCode: 0 });
+                    }, 500);
+                }, 500);
+            }, 100);
+        };
+
+        sdk.discoverPeers = async function () {
+            return [
+                {
+                    peer_id: 'peer-1',
+                    name: 'Desktop PC',
+                    device_type: 'desktop',
+                    status: 'connected',
+                    capabilities: ['file_transfer', 'clipboard', 'command', 'video'],
+                    stats: { latency: 25, bandwidth: 50000 }
+                },
+                {
+                    peer_id: 'peer-2',
+                    name: 'Laptop',
+                    device_type: 'laptop',
+                    status: 'disconnected',
+                    capabilities: ['file_transfer', 'clipboard'],
+                    stats: { latency: 45, bandwidth: 30000 }
+                },
+                {
+                    peer_id: 'peer-3',
+                    name: 'iPhone',
+                    device_type: 'mobile',
+                    status: 'connected',
+                    capabilities: ['file_transfer', 'video'],
+                    stats: { latency: 120, bandwidth: 15000 }
+                }
+            ];
+        };
+
+        sdk.connectToPeer = async function (peerId) {
+            console.log('Connecting to peer:', peerId);
+            setTimeout(() => {
+                this._emit('peerConnected', { peerId });
+            }, 1000);
+        };
+
+        sdk.disconnectFromPeer = async function (peerId) {
+            console.log('Disconnecting from peer:', peerId);
+            setTimeout(() => {
+                this._emit('peerDisconnected', { peerId });
+            }, 500);
+        };
+
+        sdk.testConnection = async function (peerId) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve({
+                        success: true,
+                        latency: Math.floor(Math.random() * 100) + 20,
+                        packetLoss: Math.floor(Math.random() * 5),
+                        message: 'Connection is stable'
+                    });
+                }, 1500);
+            });
+        };
+
+        // Initialize UI components
+        const fileTransferUI = new KizunaUI.FileTransferUI(
+            document.getElementById('file-transfer-container'),
+            sdk
+        );
+
+        const videoPlayerUI = new KizunaUI.VideoPlayerUI(
+            document.getElementById('video-player-container'),
+            sdk
+        );
+
+        const terminalUI = new KizunaUI.CommandTerminalUI(
+            document.getElementById('terminal-container'),
+            sdk
+        );
+
+        const peerManagementUI = new KizunaUI.PeerManagementUI(
+            document.getElementById('peers-container'),
+            sdk
+        );
+
+        // Tab switching
+        document.querySelectorAll('.demo-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+
+                // Update active tab
+                document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update active content
+                document.querySelectorAll('.demo-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+
+        console.log('Kizuna UI Demo initialized');
+    </script>
+</body>
+
+</html>

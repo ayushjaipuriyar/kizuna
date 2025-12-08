@@ -128,6 +128,15 @@ fn create_router(state: ServerState) -> Router {
         .route("/connect", get(browser_connect_page))
         .route("/", get(index_page))
         
+        // Static UI files
+        .route("/ui-demo.html", get(ui_demo_page))
+        .route("/kizuna-ui.js", get(ui_js_file))
+        .route("/kizuna-ui.css", get(ui_css_file))
+        .route("/kizuna-sdk.js", get(sdk_js_file))
+        .route("/kizuna-file-transfer.js", get(file_transfer_js_file))
+        .route("/kizuna-command.js", get(command_js_file))
+        .route("/kizuna-clipboard.js", get(clipboard_js_file))
+        
         // WebSocket endpoint for signaling
         .route("/ws", get(websocket_handler))
         
@@ -255,4 +264,74 @@ async fn websocket_handler() -> StatusCode {
     // TODO: Implement WebSocket upgrade for signaling
     // This will handle WebRTC signaling messages between browser and peer
     StatusCode::NOT_IMPLEMENTED
+}
+
+/// Serve UI demo page
+async fn ui_demo_page() -> Result<Response, StatusCode> {
+    let html = include_str!("../static/ui-demo.html");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/html; charset=utf-8")
+        .body(html.to_string().into())
+        .unwrap())
+}
+
+/// Serve UI JavaScript file
+async fn ui_js_file() -> Result<Response, StatusCode> {
+    let js = include_str!("../static/kizuna-ui.js");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/javascript; charset=utf-8")
+        .body(js.to_string().into())
+        .unwrap())
+}
+
+/// Serve UI CSS file
+async fn ui_css_file() -> Result<Response, StatusCode> {
+    let css = include_str!("../static/kizuna-ui.css");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "text/css; charset=utf-8")
+        .body(css.to_string().into())
+        .unwrap())
+}
+
+/// Serve SDK JavaScript file
+async fn sdk_js_file() -> Result<Response, StatusCode> {
+    let js = include_str!("../static/kizuna-sdk.js");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/javascript; charset=utf-8")
+        .body(js.to_string().into())
+        .unwrap())
+}
+
+/// Serve file transfer JavaScript file
+async fn file_transfer_js_file() -> Result<Response, StatusCode> {
+    let js = include_str!("../static/kizuna-file-transfer.js");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/javascript; charset=utf-8")
+        .body(js.to_string().into())
+        .unwrap())
+}
+
+/// Serve command JavaScript file
+async fn command_js_file() -> Result<Response, StatusCode> {
+    let js = include_str!("../static/kizuna-command.js");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/javascript; charset=utf-8")
+        .body(js.to_string().into())
+        .unwrap())
+}
+
+/// Serve clipboard JavaScript file
+async fn clipboard_js_file() -> Result<Response, StatusCode> {
+    let js = include_str!("../static/kizuna-clipboard.js");
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/javascript; charset=utf-8")
+        .body(js.to_string().into())
+        .unwrap())
 }

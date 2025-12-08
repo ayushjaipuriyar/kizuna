@@ -292,3 +292,61 @@ pub struct ConnectionStats {
     pub packet_loss_rate: f64,
     pub connection_uptime: std::time::Duration,
 }
+
+/// Push notification data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PushNotification {
+    pub title: String,
+    pub body: String,
+    pub icon: Option<String>,
+    pub badge: Option<String>,
+    pub tag: Option<String>,
+    pub data: Option<serde_json::Value>,
+    pub actions: Vec<NotificationAction>,
+    pub require_interaction: bool,
+    pub vibrate: Option<Vec<u32>>,
+}
+
+/// Notification action
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationAction {
+    pub action: String,
+    pub title: String,
+    pub icon: Option<String>,
+}
+
+/// Push subscription data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PushSubscription {
+    pub endpoint: String,
+    pub keys: PushSubscriptionKeys,
+}
+
+/// Push subscription keys
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PushSubscriptionKeys {
+    pub p256dh: String,
+    pub auth: String,
+}
+
+/// Notification preferences
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationPreferences {
+    pub file_transfer: bool,
+    pub clipboard_sync: bool,
+    pub command_execution: bool,
+    pub peer_connection: bool,
+    pub system_alerts: bool,
+}
+
+impl Default for NotificationPreferences {
+    fn default() -> Self {
+        Self {
+            file_transfer: true,
+            clipboard_sync: true,
+            command_execution: true,
+            peer_connection: true,
+            system_alerts: true,
+        }
+    }
+}

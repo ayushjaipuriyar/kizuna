@@ -278,11 +278,12 @@ impl AsyncStreamBuilder {
         mut rx: tokio::sync::watch::Receiver<T>,
     ) -> Pin<Box<dyn Stream<Item = T> + Send>>
     where
-        T: Clone + Send + 'static,
+        T: Clone + Send + Sync + 'static,
     {
         Box::pin(async_stream::stream! {
             while rx.changed().await.is_ok() {
-                yield rx.borrow().clone();
+                let value = rx.borrow_and_update().clone();
+                yield value;
             }
         })
     }
@@ -369,5 +370,8 @@ impl<T> Clone for AsyncMutex<T> {
     }
 }
 
+// Tests would go here
 #[cfg(test)]
-mod runtime_test;
+mod tests {
+    // Runtime tests can be added here
+}

@@ -63,19 +63,13 @@ impl From<&str> for PeerId {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// Peer identifier
-    pub id: PeerId,
+    pub peer_id: PeerId,
     
     /// Peer name
     pub name: String,
     
     /// Peer addresses
-    pub addresses: Vec<String>,
-    
-    /// Peer capabilities
-    pub capabilities: Vec<String>,
-    
-    /// Discovery method
-    pub discovery_method: String,
+    pub addresses: Vec<std::net::SocketAddr>,
 }
 
 /// Transfer identifier
@@ -92,6 +86,11 @@ impl TransferId {
     /// Creates a new transfer ID
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+    
+    /// Creates a transfer ID from a UUID
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
     }
 }
 
@@ -190,6 +189,11 @@ impl StreamId {
     /// Creates a new stream ID
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+    
+    /// Creates a stream ID from a UUID
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
     }
 }
 

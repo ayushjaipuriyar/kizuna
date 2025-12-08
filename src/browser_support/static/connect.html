@@ -1,24 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connect to Kizuna</title>
+
+    <!-- Compatibility and Feature Detection Scripts -->
+    <script src="/kizuna-feature-detection.js"></script>
+    <script src="/kizuna-compatibility.js"></script>
+    <script src="/kizuna-graceful-degradation.js"></script>
+    <script src="/kizuna-api-versioning.js"></script>
+    <script src="/kizuna-compatibility-integration.js"></script>
+
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .status { padding: 15px; margin: 20px 0; border-radius: 5px; }
-        .status.connecting { background: #fff3cd; border: 1px solid #ffeaa7; }
-        .status.connected { background: #d4edda; border: 1px solid #c3e6cb; }
-        .status.error { background: #f8d7da; border: 1px solid #f5c6cb; }
-        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #6c757d; cursor: not-allowed; }
-        .peer-info { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        .capabilities { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-        .capability { background: #e9ecef; padding: 5px 10px; border-radius: 15px; font-size: 12px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .status.connecting {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .peer-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+
+        .capabilities {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .capability {
+            background: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Connect to Kizuna Peer</h1>
@@ -103,7 +176,7 @@
             }
 
             const capabilities = detectProtocolCapabilities();
-            
+
             // Try WebRTC first if supported and reliable
             if (capabilities.supports_webrtc && capabilities.webrtc_reliable) {
                 try {
@@ -112,7 +185,7 @@
                 } catch (error) {
                     console.warn('WebRTC connection failed, falling back to WebSocket:', error);
                     connectionAttempts++;
-                    
+
                     if (connectionAttempts < maxConnectionAttempts) {
                         updateStatus('WebRTC failed, trying WebSocket fallback...', 'connecting');
                         await connectViaWebSocket(capabilities);
@@ -129,10 +202,10 @@
 
         async function connectViaWebRTC(capabilities) {
             updateStatus('Establishing WebRTC connection...', 'connecting');
-            
-            peerConnection = new RTCPeerConnection({iceServers: connectionInfo.ice_servers});
+
+            peerConnection = new RTCPeerConnection({ iceServers: connectionInfo.ice_servers });
             currentProtocol = 'webrtc';
-            
+
             // Set up connection state handlers
             peerConnection.oniceconnectionstatechange = () => {
                 updateConnectionStatus();
@@ -140,7 +213,7 @@
                     handleConnectionFailure('WebRTC connection failed');
                 }
             };
-            
+
             peerConnection.onconnectionstatechange = () => {
                 updateConnectionStatus();
                 if (peerConnection.connectionState === 'failed') {
@@ -151,12 +224,12 @@
             // Create control data channel
             const controlChannel = peerConnection.createDataChannel('control');
             dataChannels.control = controlChannel;
-            
+
             controlChannel.onopen = () => {
                 updateStatus('Connected via WebRTC!', 'connected');
                 onConnectionEstablished();
             };
-            
+
             controlChannel.onmessage = (event) => {
                 handleMessage(JSON.parse(event.data));
             };
@@ -177,7 +250,7 @@
             const response = await fetch(`/api/connect?setup_id=${setupId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     browser_info: browserInfo,
                     protocol: 'webrtc',
                     offer: offer.sdp
@@ -185,9 +258,9 @@
             });
 
             if (!response.ok) throw new Error('Failed to establish WebRTC connection');
-            
+
             const connectionData = await response.json();
-            
+
             if (connectionData.answer) {
                 await peerConnection.setRemoteDescription({
                     type: 'answer',
@@ -198,13 +271,13 @@
 
         async function connectViaWebSocket(capabilities) {
             updateStatus('Establishing WebSocket connection...', 'connecting');
-            
+
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/api/websocket?setup_id=${setupId}`;
-            
+
             websocketConnection = new WebSocket(wsUrl);
             currentProtocol = 'websocket';
-            
+
             websocketConnection.onopen = () => {
                 // Send handshake message
                 const handshake = {
@@ -222,10 +295,10 @@
                     },
                     timestamp: Date.now()
                 };
-                
+
                 websocketConnection.send(JSON.stringify(handshake));
             };
-            
+
             websocketConnection.onmessage = (event) => {
                 const message = JSON.parse(event.data);
                 if (message.message_type === 'WebSocketHandshake' && message.payload.status === 'connected') {
@@ -235,12 +308,12 @@
                     handleMessage(message);
                 }
             };
-            
+
             websocketConnection.onerror = (error) => {
                 console.error('WebSocket error:', error);
                 updateStatus('WebSocket connection failed', 'error');
             };
-            
+
             websocketConnection.onclose = () => {
                 if (currentProtocol === 'websocket') {
                     updateStatus('WebSocket connection closed', 'connecting');
@@ -252,7 +325,7 @@
         function handleConnectionFailure(reason) {
             console.warn('Connection failure:', reason);
             connectionAttempts++;
-            
+
             if (currentProtocol === 'webrtc' && connectionAttempts < maxConnectionAttempts) {
                 // Try WebSocket fallback
                 updateStatus('WebRTC failed, trying WebSocket fallback...', 'connecting');
@@ -267,7 +340,7 @@
 
         function handleMessage(message) {
             console.log('Received message:', message);
-            
+
             switch (message.message_type) {
                 case 'FallbackActivated':
                     updateStatus('Switched to WebSocket fallback', 'connected');
@@ -299,12 +372,12 @@
                 peerConnection = null;
                 dataChannels = {};
             }
-            
+
             if (websocketConnection) {
                 websocketConnection.close();
                 websocketConnection = null;
             }
-            
+
             currentProtocol = null;
             updateStatus('Disconnected', 'connecting');
             onConnectionClosed();
@@ -319,7 +392,7 @@
         function updateConnectionStatus() {
             const statusDetails = document.getElementById('status-details');
             let html = `<p><strong>Protocol:</strong> ${currentProtocol || 'None'}</p>`;
-            
+
             if (peerConnection && currentProtocol === 'webrtc') {
                 html += '<p><strong>Connection State:</strong> ' + peerConnection.connectionState + '</p>';
                 html += '<p><strong>ICE Connection State:</strong> ' + peerConnection.iceConnectionState + '</p>';
@@ -328,7 +401,7 @@
                 html += '<p><strong>WebSocket State:</strong> ' + websocketConnection.readyState + '</p>';
                 html += '<p><strong>Connection Type:</strong> WebSocket Fallback</p>';
             }
-            
+
             statusDetails.innerHTML = html;
         }
 
@@ -350,4 +423,5 @@
         window.onload = loadConnectionSetup;
     </script>
 </body>
+
 </html>
