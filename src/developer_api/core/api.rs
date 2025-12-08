@@ -9,10 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Import Kizuna core systems
-use crate::discovery::DiscoveryManager;
-use crate::transport::ConnectionManager;
-use crate::file_transfer::FileTransfer;
-use crate::streaming::Streaming;
+use super::integration::IntegratedSystemManager;
 
 /// Main API trait for Kizuna functionality
 #[async_trait]
@@ -63,11 +60,8 @@ pub struct KizunaInstance {
     runtime: super::runtime::AsyncRuntime,
     event_emitter: super::runtime::ThreadSafe<super::events::EventEmitter>,
     event_tx: Arc<tokio::sync::broadcast::Sender<KizunaEvent>>,
-    // Core system components with thread-safe wrappers
-    discovery: super::runtime::ThreadSafe<Option<Arc<DiscoveryManager>>>,
-    transport: super::runtime::ThreadSafe<Option<Arc<ConnectionManager>>>,
-    file_transfer: super::runtime::ThreadSafe<Option<Arc<dyn FileTransfer>>>,
-    streaming: super::runtime::ThreadSafe<Option<Arc<dyn Streaming>>>,
+    // Integrated system manager for all core systems
+    system_manager: Arc<IntegratedSystemManager>,
     // Lifecycle management
     state: Arc<tokio::sync::RwLock<InstanceState>>,
     // Shutdown coordination
@@ -101,15 +95,15 @@ impl KizunaInstance {
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
         let shutdown_tx = Arc::new(shutdown_tx);
         
+        // Create integrated system manager
+        let system_manager = Arc::new(IntegratedSystemManager::new(config.clone()));
+        
         Ok(Self {
             config,
             runtime,
             event_emitter: super::runtime::ThreadSafe::new(super::events::EventEmitter::new()),
             event_tx,
-            discovery: super::runtime::ThreadSafe::new(None),
-            transport: super::runtime::ThreadSafe::new(None),
-            file_transfer: super::runtime::ThreadSafe::new(None),
-            streaming: super::runtime::ThreadSafe::new(None),
+            system_manager,
             state: Arc::new(tokio::sync::RwLock::new(InstanceState::Initializing)),
             shutdown_tx,
             cleanup_tasks: super::runtime::ThreadSafe::new(Vec::new()),
@@ -132,12 +126,8 @@ impl KizunaInstance {
             }
         }
         
-        // Initialize discovery manager
-        let discovery = Arc::new(DiscoveryManager::new());
-        *self.discovery.write().await = Some(discovery);
-        
-        // Note: Transport, file transfer, and streaming would be initialized here
-        // For now, we'll leave them as None and implement on-demand initialization
+        // Initialize all systems through the integrated system manager
+        self.system_manager.initialize().await?;
         
         // Update state to Ready
         *self.state.write().await = InstanceState::Ready;
@@ -199,6 +189,11 @@ impl KizunaInstance {
     /// Checks if the instance is shutdown
     pub async fn is_shutdown(&self) -> bool {
         *self.state.read().await == InstanceState::Shutdown
+    }
+    
+    /// Gets the integrated system manager
+    pub fn system_manager(&self) -> &Arc<IntegratedSystemManager> {
+        &self.system_manager
     }
     
     /// Spawns a task on the runtime with automatic cleanup tracking
@@ -287,42 +282,8 @@ impl KizunaInstance {
         // Signal shutdown to runtime
         self.runtime.signal_shutdown().await;
         
-        // Clean up all systems in reverse order of initialization
-        // 1. Stop streaming
-        {
-            let mut streaming = self.streaming.write().await;
-            if streaming.is_some() {
-                // Perform streaming cleanup
-                *streaming = None;
-            }
-        }
-        
-        // 2. Stop file transfers
-        {
-            let mut file_transfer = self.file_transfer.write().await;
-            if file_transfer.is_some() {
-                // Perform file transfer cleanup
-                *file_transfer = None;
-            }
-        }
-        
-        // 3. Close transport connections
-        {
-            let mut transport = self.transport.write().await;
-            if transport.is_some() {
-                // Perform transport cleanup
-                *transport = None;
-            }
-        }
-        
-        // 4. Stop discovery
-        {
-            let mut discovery = self.discovery.write().await;
-            if discovery.is_some() {
-                // Perform discovery cleanup
-                *discovery = None;
-            }
-        }
+        // Shutdown all integrated systems
+        let _ = self.system_manager.shutdown().await;
         
         // Wait for cleanup tasks to complete with timeout
         {
@@ -356,14 +317,23 @@ impl KizunaAPI for KizunaInstance {
             return Err(KizunaError::state(format!("Cannot discover peers: instance is in {:?} state", current_state)));
         }
         
-        let discovery = self.discovery.read().await;
-        let _discovery_manager = discovery.as_ref()
-            .ok_or_else(|| KizunaError::other("Discovery system not initialized"))?;
+        // Get discovery system from integrated manager
+        let discovery_arc = self.system_manager.discovery().await?;
+        let discovery = discovery_arc.read().await;
         
-        // Discovery integration would happen here
-        // For now, return an empty stream as a placeholder
+        // Discover peers
+        let peers = discovery.discover_once(None).await
+            .map_err(|e| KizunaError::discovery(format!("Discovery failed: {}", e)))?;
+        
+        // Convert to stream
         use futures::stream;
-        let stream = stream::iter(vec![]); 
+        let peer_infos: Vec<PeerInfo> = peers.into_iter().map(|sr| PeerInfo {
+            peer_id: sr.peer_id.into(),
+            name: sr.name,
+            addresses: sr.addresses,
+        }).collect();
+        
+        let stream = stream::iter(peer_infos);
         Ok(Box::pin(stream))
     }
     
@@ -374,12 +344,22 @@ impl KizunaAPI for KizunaInstance {
             return Err(KizunaError::state(format!("Cannot connect to peer: instance is in {:?} state", current_state)));
         }
         
-        let transport = self.transport.read().await;
-        let _transport_manager = transport.as_ref()
-            .ok_or_else(|| KizunaError::other("Transport system not initialized"))?;
+        // Get transport system from integrated manager
+        let transport_arc = self.system_manager.transport().await?;
+        let transport = transport_arc.read().await;
         
-        // Connect to peer using transport layer
-        // For now, return a basic connection handle
+        // Create peer address (simplified - in production would need full address info)
+        let peer_address = crate::transport::PeerAddress::new(
+            peer_id.to_string(),
+            vec![],
+            vec!["tcp".to_string()],
+            crate::transport::TransportCapabilities::tcp(),
+        );
+        
+        // Connect to peer
+        let _connection = transport.connect_to_peer(&peer_address).await
+            .map_err(|e| KizunaError::transport(format!("Connection failed: {}", e)))?;
+        
         Ok(PeerConnection { peer_id })
     }
     
@@ -395,17 +375,20 @@ impl KizunaAPI for KizunaInstance {
             return Err(KizunaError::other(format!("File not found: {:?}", file)));
         }
         
-        let file_transfer = self.file_transfer.read().await;
-        let _transfer_manager = file_transfer.as_ref()
-            .ok_or_else(|| KizunaError::other("File transfer system not initialized"))?;
+        // Get file transfer system from integrated manager
+        let ft_arc = self.system_manager.file_transfer().await?;
+        let ft = ft_arc.as_ref();
         
-        // Initiate file transfer
-        // For now, return a basic transfer handle
+        // Start file transfer
+        let session = ft.send_file(file, peer_id.to_string()).await
+            .map_err(|e| KizunaError::file_transfer(format!("File transfer failed: {}", e)))?;
+        
         Ok(TransferHandle { 
-            transfer_id: TransferId::new() 
+            transfer_id: TransferId::from_uuid(session.session_id)
         })
     }
     
+    #[cfg(feature = "streaming")]
     async fn start_stream(&self, config: StreamConfig) -> Result<StreamHandle, KizunaError> {
         // Check state
         let current_state = *self.state.read().await;
@@ -413,15 +396,28 @@ impl KizunaAPI for KizunaInstance {
             return Err(KizunaError::state(format!("Cannot start stream: instance is in {:?} state", current_state)));
         }
         
-        let streaming = self.streaming.read().await;
-        let _streaming_manager = streaming.as_ref()
-            .ok_or_else(|| KizunaError::other("Streaming system not initialized"))?;
+        // Get streaming system from integrated manager
+        let streaming_arc = self.system_manager.streaming().await?;
+        let streaming = streaming_arc.as_ref();
         
-        // Start media stream
-        // For now, return a basic stream handle
+        // Convert config to streaming config
+        let stream_config = crate::streaming::StreamConfig {
+            quality: config.quality,
+            ..Default::default()
+        };
+        
+        // Start camera stream
+        let session = streaming.start_camera_stream(stream_config).await
+            .map_err(|e| KizunaError::streaming(format!("Stream start failed: {}", e)))?;
+        
         Ok(StreamHandle { 
-            stream_id: StreamId::new() 
+            stream_id: StreamId::from_uuid(session.session_id)
         })
+    }
+    
+    #[cfg(not(feature = "streaming"))]
+    async fn start_stream(&self, _config: StreamConfig) -> Result<StreamHandle, KizunaError> {
+        Err(KizunaError::state("Streaming feature not enabled"))
     }
     
     async fn execute_command(&self, command: String, peer_id: PeerId) -> Result<CommandResult, KizunaError> {
@@ -511,14 +507,15 @@ impl StreamHandle {
 /// Configuration for media streaming
 #[derive(Debug, Clone)]
 pub struct StreamConfig {
-    /// Stream type
-    pub stream_type: super::events::StreamType,
-    
     /// Target peer ID
     pub peer_id: PeerId,
     
-    /// Video quality (0-100)
-    pub quality: u8,
+    /// Video quality
+    #[cfg(feature = "streaming")]
+    pub quality: crate::streaming::StreamQuality,
+    
+    #[cfg(not(feature = "streaming"))]
+    pub quality: String,
 }
 
 /// Result of a command execution
@@ -534,5 +531,7 @@ pub struct CommandResult {
     pub stderr: String,
 }
 
+// Tests are in a separate file
 #[cfg(test)]
-mod api_test;
+#[path = "api_test.rs"]
+mod tests;

@@ -53,11 +53,9 @@ impl MockPeer {
     /// Converts to PeerInfo
     pub fn to_peer_info(&self) -> PeerInfo {
         PeerInfo {
-            id: format!("mock-{}", self.config.name).into(),
+            peer_id: format!("mock-{}", self.config.name).into(),
             name: self.config.name.clone(),
-            addresses: vec!["127.0.0.1:0".to_string()],
-            capabilities: self.config.capabilities.clone(),
-            discovery_method: "mock".to_string(),
+            addresses: vec!["127.0.0.1:0".parse().unwrap()],
         }
     }
 }

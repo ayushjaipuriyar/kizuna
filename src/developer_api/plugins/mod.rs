@@ -3,12 +3,21 @@ pub mod registry;
 pub mod hooks;
 pub mod sandbox;
 pub mod loader;
+pub mod system_hooks;
 
 // Re-export plugin types
 pub use registry::PluginRegistry;
 pub use hooks::{PluginHook, HookType};
 pub use sandbox::{PluginSandbox, ResourceLimits, PluginPermissions};
 pub use loader::PluginLoader;
+pub use system_hooks::{
+    DiscoveryHook, TransportHook, SecurityHook, FileTransferHook,
+    ClipboardHook, CommandExecutionHook,
+    SystemHookRegistry, SecurityEvent,
+};
+
+#[cfg(feature = "streaming")]
+pub use system_hooks::StreamingHook;
 
 use crate::developer_api::core::KizunaError;
 use std::collections::HashMap;
