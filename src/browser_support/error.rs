@@ -28,6 +28,74 @@ pub enum BrowserSupportError {
     
     #[error("Configuration error: {parameter} - {issue}")]
     ConfigurationError { parameter: String, issue: String },
+    
+    #[error("Authentication failed: {0}")]
+    AuthenticationFailed(String),
+    
+    #[error("Session not found: {0}")]
+    SessionNotFound(String),
+    
+    #[error("Permission denied: {0}")]
+    PermissionDenied(String),
+    
+    #[error("Encryption failed: {0}")]
+    EncryptionFailed(String),
+    
+    #[error("Decryption failed: {0}")]
+    DecryptionFailed(String),
+    
+    #[error("Certificate validation failed: {0}")]
+    CertificateValidationFailed(String),
+    
+    #[error("HTTPS required: {0}")]
+    HTTPSRequired(String),
+    
+    #[error("Security policy violation: {0}")]
+    SecurityPolicyViolation(String),
+    
+    #[error("Integration error with {system}: {message}")]
+    IntegrationError { system: String, message: String },
+}
+
+impl BrowserSupportError {
+    /// Create an integration error
+    pub fn integration(system: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::IntegrationError {
+            system: system.into(),
+            message: message.into(),
+        }
+    }
+    
+    /// Create a session not found error
+    pub fn session_not_found(session_id: impl Into<String>) -> Self {
+        Self::SessionNotFound(session_id.into())
+    }
+    
+    /// Create a permission denied error
+    pub fn permission_denied(message: impl Into<String>) -> Self {
+        Self::PermissionDenied(message.into())
+    }
+    
+    /// Create a not found error
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::SessionNotFound(message.into())
+    }
+    
+    /// Create a validation error
+    pub fn validation(message: impl Into<String>) -> Self {
+        Self::ConfigurationError {
+            parameter: "validation".to_string(),
+            issue: message.into(),
+        }
+    }
+    
+    /// Create a not implemented error
+    pub fn not_implemented(feature: impl Into<String>) -> Self {
+        Self::BrowserCompatibilityError {
+            browser: "unknown".to_string(),
+            issue: format!("Feature not implemented: {}", feature.into()),
+        }
+    }
 }
 
 impl From<webrtc::Error> for BrowserSupportError {

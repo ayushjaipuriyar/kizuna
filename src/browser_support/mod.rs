@@ -13,13 +13,32 @@ pub mod types;
 pub mod discovery;
 pub mod communication;
 pub mod websocket_fallback;
+pub mod security_integration;
+pub mod https_security;
+pub mod audit_logging;
+pub mod file_transfer_integration;
+pub mod clipboard_integration;
+#[cfg(feature = "streaming")]
+pub mod streaming_integration;
+pub mod command_integration;
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod websocket_fallback_test;
+
+#[cfg(test)]
+mod communication_test;
+
 pub use error::{BrowserSupportError, BrowserResult};
 pub use types::*;
 pub use discovery::*;
+pub use file_transfer_integration::{BrowserFileTransferIntegration, BrowserFileTransfer, BrowserTransferSession, TransferDirection};
+pub use clipboard_integration::{BrowserClipboardIntegration, BrowserClipboard};
+#[cfg(feature = "streaming")]
+pub use streaming_integration::{BrowserStreamingIntegration, BrowserStreaming};
+pub use command_integration::{BrowserCommandIntegration, BrowserCommand};
 
 use crate::Result;
 use std::sync::Arc;
